@@ -8,6 +8,7 @@ from textwrap import dedent
 from typing import Iterable
 
 import nox
+import tomlkit as toml
 
 try:
     from nox_poetry import Session, session
@@ -29,8 +30,6 @@ nox.options.sessions = (
     "safety",
     "mypy",
     "tests",
-
-
     "docs-build",
 )
 
@@ -38,7 +37,7 @@ nox.options.sessions = (
 def group(g: str) -> Iterable[str]:
     with open("pyproject.toml", "r") as fp:
         data = toml.loads(fp.read())
-    return data["tools"]["poetry"]["group"][g]["dependencies"].keys()
+    return data["tool"]["poetry"]["group"][g]["dependencies"].keys()
 
 
 def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
@@ -96,8 +95,7 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
         text = hook.read_text()
 
         if not any(
-            Path("A") == Path("a") and bindir.lower(
-            ) in text.lower() or bindir in text
+            Path("A") == Path("a") and bindir.lower() in text.lower() or bindir in text
             for bindir in bindirs
         ):
             continue
@@ -115,9 +113,7 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
 def precommit(session: Session) -> None:
     """Lint using pre-commit."""
     args = session.posargs or ["run", "--all-files", "--show-diff-on-failure"]
-    session.install(
-        *group("pre-commit")
-    )
+    session.install(*group("pre-commit"))
     session.run("pre-commit", *args)
     if args and args[0] == "install":
         activate_virtualenv_in_precommit_hooks(session)
@@ -134,8 +130,7 @@ def safety(session: Session) -> None:
 @session(python=python_versions)
 def mypy(session: Session) -> None:
     """Type-check using mypy."""
-    args = session.posargs or [
-        "pyvoice", "tests", "docs/conf.py"]
+    args = session.posargs or ["pyvoice", "tests", "docs/conf.py"]
     session.install(".")
     session.install("mypy", "pytest")
     session.run("mypy", *args)

@@ -50,7 +50,7 @@ You need Python 3.7+ and the following tools:
 - nox-poetry_
 
 
-You should install the prerelease for poetry 
+You should install the prerelease for poetry
 
 .. code:: console
 
