@@ -1,0 +1,106 @@
+[tool.poetry]
+name = "pyvoice"
+version = "0.0.0"
+description = "pyvoice"
+authors = ["mpourmpoulis <35875229+mpourmpoulis@users.noreply.github.com>"]
+license = "GPL-3.0"
+readme = "README.rst"
+homepage = "https://github.com/PythonVoiceCodingPlugin/pyvoice"
+repository = "https://github.com/PythonVoiceCodingPlugin/pyvoice"
+documentation = "https://pyvoice.readthedocs.io"
+classifiers = [
+    "Development Status :: 1 - Planning",
+]
+
+[tool.poetry.urls]
+Changelog = "https://github.com/PythonVoiceCodingPlugin/pyvoice/releases"
+
+
+
+[tool.poetry.dependencies]
+python = "^3.7"
+click = "^8.0.1"
+
+
+[tools.poetry.group."dev"]
+optional=true
+[tools.poetry.group."dev".dependencies]
+coverage = {extras = ["toml"], version = "^6.2"}
+safety = "^1.10.3"
+mypy = "^0.910"
+
+
+[tools.poetry.group."tests"]
+optional=true
+[tools.poetry.group."tests".dependencies]
+pytest-sugar = "^0.9.4"
+pytest-randomly = "^3.10.3"
+pytest-cov = "^3.0.0"
+pytest = "^6.2.5"
+xdoctest = {extras = ["colors"], version = "^0.15.10"}
+
+
+
+[tools.poetry.group."docs"]
+optional=true
+[tools.poetry.group."docs".dependencies]
+sphinx = "^4.3.1"
+sphinx-click = "^3.0.2"
+sphinx-autobuild = ">=2021.3.14"
+furo = ">=2021.11.12"
+Pygments = "^2.9.0"
+
+
+[tools.poetry.group."pre-commit"]
+optional=true
+[tools.poetry.group."pre-commit".dependencies]
+flake8-bandit = "^2.1.2"
+pre-commit = "^2.16.0"
+flake8 = "^4.0.1"
+black = ">=21.10b0"
+isort = "^5.10.1"
+flake8-bugbear = ">=21.9.2"
+flake8-docstrings = "^1.6.0"
+flake8-rst-docstrings = "^0.2.5"
+pep8-naming = "^0.12.1"
+darglint = "^1.8.1"
+pre-commit-hooks = "^4.0.1"
+
+
+[tool.pytest.ini_options]
+adopts="--xdoctest --cov"
+
+
+[tool.poetry.scripts]
+pyvoice = "pyvoice.__main__:main"
+
+[tool.coverage.paths]
+source = [".", "*/site-packages"]
+tests = ["tests", "*/tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["pyvoice", "tests"]
+
+[tool.coverage.report]
+show_missing = true
+fail_under = 100
+
+
+
+[tool.mypy]
+strict = true
+warn_unreachable = true
+pretty = true
+show_column_numbers = true
+show_error_codes = true
+show_error_context = true
+
+[tool.isort]
+profile = "black"
+
+
+
+[build-system]
+requires = ["poetry-core>=1.1.0a6"]
+build-backend = "poetry.core.masonry.api"

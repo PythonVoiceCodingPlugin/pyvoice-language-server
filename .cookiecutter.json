@@ -1,0 +1,12 @@
+{
+  "_template": "https://github.com/mpourmpoulis/cookiecutter-hypermodern-python",
+  "author": "mpourmpoulis",
+  "development_status": "Development Status :: 1 - Planning",
+  "email": "35875229+mpourmpoulis@users.noreply.github.com",
+  "friendly_name": "pyvoice",
+  "github_user": "PythonVoiceCodingPlugin",
+  "license": "GPL-3.0",
+  "package_name": "pyvoice",
+  "project_name": "pyvoice",
+  "version": "0.0.0"
+}
