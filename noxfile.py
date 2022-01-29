@@ -61,6 +61,7 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
     ]
 
     virtualenv = session.env.get("VIRTUAL_ENV")
+    print(virtualenv)
     if virtualenv is None:
         return
 
@@ -76,6 +77,10 @@ def activate_virtualenv_in_precommit_hooks(session: Session) -> None:
             """,
         # pre-commit >= 2.16.0
         "bash": f"""\
+            VIRTUAL_ENV={shlex.quote(virtualenv)}
+            PATH={shlex.quote(session.bin)}"{os.pathsep}$PATH"
+            """,
+        "sh": f"""\
             VIRTUAL_ENV={shlex.quote(virtualenv)}
             PATH={shlex.quote(session.bin)}"{os.pathsep}$PATH"
             """,
