@@ -49,6 +49,11 @@ You need Python 3.7+ and the following tools:
 - Nox_
 - nox-poetry_
 
+then you need to install hooks for pre-commit
+
+.. code:: console
+
+   $ nox -rs pre-commit -- install
 
 You should install the prerelease for poetry
 
