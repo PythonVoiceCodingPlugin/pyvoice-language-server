@@ -47,7 +47,7 @@ optional=true
 sphinx = "^4.3.1"
 sphinx-click = "^3.0.2"
 sphinx-autobuild = ">=2021.3.14"
-furo = ">=2021.11.12"
+sphinx_rtd_theme = "*"
 Pygments = "^2.9.0"
 
 
@@ -57,8 +57,8 @@ optional=true
 flake8-bandit = "^2.1.2"
 pre-commit = "^2.16.0"
 flake8 = "^4.0.1"
-black = ">=21.10b0"
-isort = "^5.10.1"
+black = "22.1.0"
+isort = "5.10.1"
 flake8-bugbear = ">=21.9.2"
 flake8-docstrings = "^1.6.0"
 flake8-rst-docstrings = "^0.2.5"
@@ -68,7 +68,7 @@ pre-commit-hooks = "^4.0.1"
 
 
 [tool.pytest.ini_options]
-adopts="--xdoctest --cov"
+addopts="--xdoctest --cov"
 
 
 [tool.poetry.scripts]
