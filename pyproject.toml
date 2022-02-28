@@ -23,6 +23,7 @@ click = "^8.0.1"
 pygls = "^0.11.3"
 pydantic = "*"
 jedi = "^0.18.1"
+libcst = "^0.4.1"
 
 
 [tool.poetry.group."dev"]

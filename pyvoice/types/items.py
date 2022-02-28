@@ -15,6 +15,6 @@ class SpokenItem(Model):
 
 class ModuleItem(SpokenItem):
     kind = SpokenKind.IMPORTABLE
-    module: Optional[str]
+    module: str
     name: Optional[str]
     asname: Optional[str]
