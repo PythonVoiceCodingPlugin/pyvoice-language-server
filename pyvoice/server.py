@@ -1,7 +1,7 @@
 import functools
 import os
 from pathlib import Path
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, Sequence, TypeVar
 
 import jedi
 import libcst as cst
@@ -100,14 +100,14 @@ def generate_nested(
     name: jedi.api.classes.Name,
     prefix: str,
     level: Optional[int] = None,
-    script: Optional[jedi.Script] = None,
+    project: Optional[jedi.Project] = None,
 ):
     if level is None:
         level = default_levels.get(name.type, 1)
     if level <= 0:
         return
     if name.type == "module":
-        for n in name.defined_names():
+        for n in module_public_names(project, name.full_name):
             yield with_prefix(prefix, n)
             yield from generate_nested(n, prefix, level - 1)
     elif name.type == "instance":
@@ -120,26 +120,32 @@ def generate_nested(
             yield from generate_nested(n, prefix, level - 1)
 
 
-# def generate_nested(n, s: str = ""):
-#     if not n:
-#         returnwith_prefix()
-#     for b in n.defined_names() or next(((x.defined_names() for x in n.infer())), []):
-#         if b.type == "function":
-#             yield (f"{s or n.name}.{b.name}()")
-#         else:
-#             yield (f"{s or n.name}.{b.name}")functoolsfunctools.lru_cache()
+@functools.lru_cache()
+def ignored_names(project: jedi.Project):
+    return {x.full_name for x in jedi.Script("", project=project).complete()}
+
+
+def module_public_names(
+    project: jedi.Project, module_name: str
+) -> Sequence[jedi.api.classes.BaseName]:
+    ignore = ignored_names(project)
+    return [
+        name
+        for name in jedi.Script(
+            f"from {module_name} import *\n", project=project
+        ).complete()
+        if name.full_name not in ignore and name.full_name
+    ]
 
 
 @functools.lru_cache()
 def get_builtin_modules(project: jedi.Project):
-    ignore = {x.full_name for x in jedi.Script("", project=project).complete()}
     output = [
         ModuleItem(
             spoken=speak_single_item(f"{x} {name.name}"), module=x, name=name.name
         )
         for x in ["typing"]
-        for name in jedi.Script(f"from {x} import *\n", project=project).complete()
-        if name.full_name not in ignore and name.full_name
+        for name in module_public_names(project, x)
     ]
     return output
 
@@ -155,7 +161,7 @@ def get_modules(project: jedi.Project):
             lambda p: p.relative_to(project.path),
             Path(project.path).glob("[!.]*\\**\\*.py"),
         )
-        if len(x.parts) > 1 and not "." in x.parts[0]
+        if len(x.parts) > 1 and "." not in x.parts[0]
     ]
     return output + get_builtin_modules(project)
 
@@ -170,7 +176,7 @@ def function(server: PyVoiceLanguageServer, doc_uri: str):
     output = []
     for n in x:
         output.append(with_prefix("", n))
-        output.extend(generate_nested(n, n.name, None))
+        output.extend(generate_nested(n, n.name, None, server.project))
 
     output = [x for x in output if "__" not in x]
     server.show_message(len(output))

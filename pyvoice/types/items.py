@@ -1,5 +1,6 @@
 import enum
-from typing import Optional
+from enum import Enum, Flag
+from typing import Optional, Sequence
 
 from .models import Model
 
