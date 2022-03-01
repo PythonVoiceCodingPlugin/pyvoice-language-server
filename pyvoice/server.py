@@ -73,7 +73,7 @@ server = PyVoiceLanguageServer(protocol_cls=MyProtocol)
 
 def speak_single_item(x):
     # if re.match(r"[A-Z_]+", x):
-    #     return x.lower().replace("_", " ")
+    #     return x.lower().replace("_", " ")abc
 
     s = speakit.split_symbol(x)
     s = " ".join([(x.upper() if len(x) in [2, 3] else x) for x in s.split()])
@@ -153,8 +153,8 @@ def get_builtin_modules(project: jedi.Project):
 def get_modules(project: jedi.Project):
     output = [
         ModuleItem(
-            spoken=speak_single_item(" ".join(x.parts[1:])),
-            module=".".join(x.parts[:-1]),
+            spoken=speak_single_item(" ".join(x.parts).replace(".py", "")),
+            module=".".join(x.parts[:-1]).replace(".py", ""),
             name=x.stem,
         )
         for x in map(
