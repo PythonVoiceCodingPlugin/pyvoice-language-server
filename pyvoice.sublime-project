@@ -11,7 +11,7 @@
 		{
 			"pyvoice":
 			{
-				"enabled": false,
+				"enabled": true,
 			},
 		},
 	},

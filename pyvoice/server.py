@@ -6,6 +6,8 @@ from typing import Any, Callable, Optional, Sequence, TypeVar
 import jedi
 import libcst as cst
 import speakit
+import toml
+from importlib_metadata import Distribution
 from jedi.inference.names import ImportName, SubModuleName
 from libcst import codemod as transformations
 from pydantic import validate_arguments
@@ -138,13 +140,55 @@ def module_public_names(
     ]
 
 
+def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
+    p = project.path / "pyproject.toml"
+    data = toml.loads(p.read_text())
+    return data["tool"]["poetry"]["dependencies"].keys()
+
+
+@functools.lru_cache()
+def get_modules_from_distribution(
+    project: jedi.Project, name: str
+) -> Sequence[ModuleItem]:
+    try:
+        return [
+            relative_path_to_item(f)
+            for distribution in Distribution.discover(
+                name=name, path=project.get_environment().get_sys_path()
+            )
+            for f in distribution.files
+            if f.suffix == ".py"
+        ]
+
+    except Exception:
+        if name != "python":
+            raise ValueError(name)
+        return []
+
+
+def get_top_level_dependencies_modules(project: jedi.Project):
+    return [
+        x
+        for dependency_name in get_top_level_dependencies_names(project)
+        for x in get_modules_from_distribution(project, dependency_name)
+    ]
+
+
+def relative_path_to_item(x: Path) -> ModuleItem:
+    return ModuleItem(
+        spoken=speak_single_item(" ".join(x.parts).replace(".py", "")),
+        module=".".join(x.parts[:-1]).replace(".py", ""),
+        name=x.stem,
+    )
+
+
 @functools.lru_cache()
 def get_builtin_modules(project: jedi.Project):
     output = [
         ModuleItem(
             spoken=speak_single_item(f"{x} {name.name}"), module=x, name=name.name
         )
-        for x in ["typing"]
+        for x in ["typing", "importlib_metadata"]
         for name in module_public_names(project, x)
     ]
     return output
@@ -152,18 +196,18 @@ def get_builtin_modules(project: jedi.Project):
 
 def get_modules(project: jedi.Project):
     output = [
-        ModuleItem(
-            spoken=speak_single_item(" ".join(x.parts).replace(".py", "")),
-            module=".".join(x.parts[:-1]).replace(".py", ""),
-            name=x.stem,
-        )
+        relative_path_to_item(x)
         for x in map(
             lambda p: p.relative_to(project.path),
             Path(project.path).glob("[!.]*\\**\\*.py"),
         )
         if len(x.parts) > 1 and "." not in x.parts[0]
     ]
-    return output + get_builtin_modules(project)
+    return (
+        output
+        + get_builtin_modules(project)
+        + get_top_level_dependencies_modules(project)
+    )
 
 
 @server.command("get_spoken")
