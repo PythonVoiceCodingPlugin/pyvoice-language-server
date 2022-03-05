@@ -1,5 +1,4 @@
 import functools
-import os
 from pathlib import Path
 from typing import Any, Callable, Optional, Sequence, TypeVar
 
@@ -21,6 +20,7 @@ from pyvoice.types.items import ModuleItem
 
 from .text_edit_utils import lsp_text_edits
 
+# you code new codeproject.get_environment()
 protocol.deserialize_command = lambda p: p
 F = TypeVar("F", bound=Callable)
 
@@ -31,13 +31,14 @@ class MyProtocol(LanguageServerProtocol):
         x = super().lsp_initialize(params)
         self._server.project = jedi.Project(
             self._server.workspace.root_path,
-            environment_path=os.path.join(self._server.workspace.root_path, ".venv"),
+            environment_path=Path(self._server.workspace.root_path) / ".venv",
         )
-
         return x
 
 
 class PyVoiceLanguageServer(LanguageServer):
+    project: jedi.Project
+
     def __init__(
         self, loop=None, protocol_cls=LanguageServerProtocol, max_workers: int = 2
     ):
@@ -72,6 +73,8 @@ class PyVoiceLanguageServer(LanguageServer):
 
 server = PyVoiceLanguageServer(protocol_cls=MyProtocol)
 
+# server.workspace
+
 
 def speak_single_item(x):
     # if re.match(r"[A-Z_]+", x):
@@ -95,7 +98,23 @@ def with_prefix(prefix: str, name: jedi.api.classes.Name):
     return f"{prefix}{n}"
 
 
-default_levels = {"module": 1, "instance": 3}
+default_levels = {"module": 1, "instance": 3, "variable": 3, "param": 3, "statement": 3}
+
+
+@functools.lru_cache(maxsize=128)
+def instance_attributes(
+    full_name: str, project: jedi.Project
+) -> Sequence[jedi.api.classes.BaseName]:
+    text = f"""
+import {full_name.split('.')[0]}
+_ : {full_name}
+_."""
+    s = jedi.Script(text, project=project)
+    return [
+        x
+        for x in s.complete()
+        if "__" not in x.name and "leave" not in x.name and "visit" not in x.name
+    ]
 
 
 def generate_nested(
@@ -113,10 +132,21 @@ def generate_nested(
             yield with_prefix(prefix, n)
             yield from generate_nested(n, prefix, level - 1)
     elif name.type == "instance":
-        for n in name.defined_names():
+        for n in instance_attributes(name.full_name, project):
             yield with_prefix(prefix, n)
-            yield from generate_nested(n, prefix, level - 1)
+            if n.type in ["instance"]:
+                yield from generate_nested(n, f"{prefix}.{n.name}", level - 1, project)
+    elif name.type in ["variable", "statement", "param"]:
+        for n in name.infer():
+            yield from generate_nested(n, prefix, level, project)
+    elif name.type == "function":
+        if "def " in name.get_line_code():
+            for n in name.defined_names():
+                yield with_prefix(prefix, n)
+                yield from generate_nested(n, n.name, None, project)
+
     else:
+        return
         for n in name.defined_names():
             yield with_prefix(prefix, n)
             yield from generate_nested(n, prefix, level - 1)
@@ -194,6 +224,9 @@ def get_builtin_modules(project: jedi.Project):
     return output
 
 
+# server project Environmentserver.a
+
+
 def get_modules(project: jedi.Project):
     output = [
         relative_path_to_item(x)
@@ -216,13 +249,17 @@ def function(server: PyVoiceLanguageServer, doc_uri: str):
     document = server.workspace.get_document(doc_uri)
     s = jedi.Script(code=document.source, path=document.path, project=server.project)
     x = s.get_names()
-    server.show_message(f"{x}")
+    server.show_message(f"{len(x)}")
     output = []
     for n in x:
         output.append(with_prefix("", n))
-        output.extend(generate_nested(n, n.name, None, server.project))
+        output.extend(
+            generate_nested(
+                n, n.name if n.type != "function" else "", None, server.project
+            )
+        )
 
-    output = [x for x in output if "__" not in x]
+    output = [x for x in sorted(set(output)) if "__" not in x]
     server.show_message(len(output))
     server.send_voice("enhance", speak_items(output))
     server.send_voice("enhance_import", get_modules(server.project))
