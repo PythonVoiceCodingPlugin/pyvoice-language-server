@@ -1,6 +1,6 @@
 import functools
 from pathlib import Path
-from typing import Any, Callable, Optional, Sequence, TypeVar
+from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union
 
 import jedi
 import libcst as cst
@@ -61,7 +61,8 @@ class PyVoiceLanguageServer(LanguageServer):
             def function(server: PyVoiceLanguageServer, args):
                 return f(server, *args)
 
-            return self.lsp.fm.command(command_name)(function)
+            self.lsp.fm.command(command_name)(function)
+            return f
 
         return wrapper
 
@@ -79,6 +80,11 @@ server = PyVoiceLanguageServer(protocol_cls=MyProtocol)
 def speak_single_item(x):
     # if re.match(r"[A-Z_]+", x):
     #     return x.lower().replace("_", " ")abc
+    x = (
+        x.replace("python_voice_coding_plugin.typing", "")
+        .replace("python_voice_coding_plugin.types", "")
+        .replace("python_voice_coding_plugin", "root")
+    )
 
     s = speakit.split_symbol(x)
     s = " ".join([(x.upper() if len(x) in [2, 3] else x) for x in s.split()])
@@ -105,6 +111,8 @@ default_levels = {"module": 1, "instance": 3, "variable": 3, "param": 3, "statem
 def instance_attributes(
     full_name: str, project: jedi.Project
 ) -> Sequence[jedi.api.classes.BaseName]:
+    if full_name is None:
+        return []
     text = f"""
 import {full_name.split('.')[0]}
 _ : {full_name}
@@ -205,6 +213,14 @@ def get_top_level_dependencies_modules(project: jedi.Project):
 
 
 def relative_path_to_item(x: Path) -> ModuleItem:
+    if x.name == "__init__.py":
+        return relative_path_to_item(x.parent)
+    if len(x.parts) == 1:
+        return ModuleItem(
+            spoken=speak_single_item(" ".join(x.parts).replace(".py", "")),
+            module=x.name.replace(".py", ""),
+            name=None,
+        )
     return ModuleItem(
         spoken=speak_single_item(" ".join(x.parts).replace(".py", "")),
         module=".".join(x.parts[:-1]).replace(".py", ""),
@@ -218,7 +234,14 @@ def get_builtin_modules(project: jedi.Project):
         ModuleItem(
             spoken=speak_single_item(f"{x} {name.name}"), module=x, name=name.name
         )
-        for x in ["typing", "importlib_metadata"]
+        for x in [
+            "typing",
+            "importlib_metadata",
+            "enum",
+            "pathlib",
+            "python_voice_coding_plugin.typing",
+            "python_voice_coding_plugin.types",
+        ]
         for name in module_public_names(project, x)
     ]
     return output
@@ -266,14 +289,85 @@ def function(server: PyVoiceLanguageServer, doc_uri: str):
 
 
 @server.command("add_import")
-def function_add_import(server: PyVoiceLanguageServer, doc_uri: str, item: ModuleItem):
+def function_add_import(
+    server: PyVoiceLanguageServer,
+    doc_uri: str,
+    items: Union[ModuleItem, List[ModuleItem]],
+):
+    server.show_message(f"{items}")
     document = server.workspace.get_document(doc_uri)
     wrapper = cst.MetadataWrapper(cst.parse_module(document.source))
     context = transformations.CodemodContext(wrapper=wrapper)
+    items = items if isinstance(items, list) else [items]
     transformer = transformations.visitors.AddImportsVisitor(  # type: ignore[attr-defined]
         context,
-        [transformations.visitors.ImportItem(item.module, item.name, item.asname)],
+        [
+            transformations.visitors.ImportItem(item.module, item.name, item.asname)
+            for item in items
+        ],
     )
     result = transformations.transform_module(transformer, document.source)
     edit = WorkspaceEdit(changes={doc_uri: lsp_text_edits(document, result.code)})
     server.apply_edit(edit)
+
+
+def join_names(a: str, b: str) -> str:
+    if a and b:
+        return f"{a}.{b}"
+    else:
+        return f"{a or b}"
+
+
+@server.command("from_import")
+def function_from_import(server: PyVoiceLanguageServer, item: ModuleItem):
+    module_name = join_names(item.module, item.name)
+    s = [
+        ModuleItem(spoken=speak_single_item(x.name), module=module_name, name=x.name)
+        for x in module_public_names(server.project, module_name)
+    ]
+    server.send_voice("enhance_from_import", s)
+
+
+def module_public_names_fuzzy(
+    project: jedi.Project, current_path: str, module_name: str, name: str
+) -> Sequence[jedi.api.classes.BaseName]:
+    ignore = ignored_names(project)
+    return [
+        name
+        for name in jedi.Script(
+            f"from {module_name} import *\n{name.replace(' ','')}",
+            project=project,
+            path=current_path,
+        ).complete(fuzzy=True)
+        if name.full_name not in ignore and name.full_name
+    ]
+
+
+@server.command("from_import_fuzzy")
+def function_from_import_fuzzy(
+    server: PyVoiceLanguageServer,
+    doc_uri: str,
+    item: ModuleItem,
+    name: str,
+    every: bool,
+):
+    module_name = join_names(item.module, item.name)
+    document = server.workspace.get_document(doc_uri)
+    choices = module_public_names_fuzzy(
+        server.project, document.path, module_name, name
+    )
+    choices = list(
+        sorted(
+            choices,
+            reverse=True,
+            key=lambda x: x.full_name == join_names(module_name, x.name),
+        )
+    )
+    chosen = choices if every else [choices[0]]
+    server.show_message(f"{choices}")
+    items = [ModuleItem(spoken="", module=module_name, name=x.name) for x in chosen]
+    function_add_import(server, doc_uri, items)
+    # server.send_voice("enhance_from_import", s)
+
+
+# b
