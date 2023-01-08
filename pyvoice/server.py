@@ -1,6 +1,7 @@
 import functools
+import re
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, List, Optional, Sequence, Union
 
 import jedi
 import libcst as cst
@@ -12,10 +13,9 @@ from libcst import codemod as transformations
 from pydantic import validate_arguments
 from pygls import protocol
 from pygls.lsp.methods import INITIALIZE
-from pygls.lsp.types import InitializeParams, InitializeResult, WorkspaceEdit
+from pygls.lsp.types import InitializeParams, InitializeResult, Position, WorkspaceEdit
 from pygls.protocol import LanguageServerProtocol, lsp_method
 from pygls.server import LanguageServer
-
 from pyvoice.types.items import ModuleItem
 
 from .text_edit_utils import lsp_text_edits
@@ -78,16 +78,17 @@ server = PyVoiceLanguageServer(protocol_cls=MyProtocol)
 
 
 def speak_single_item(x):
-    # if re.match(r"[A-Z_]+", x):
-    #     return x.lower().replace("_", " ")abc
+    if re.match(r"[A-Z_]+", x):
+        x = x.lower().replace("_", " ")
     x = (
         x.replace("python_voice_coding_plugin.typing", "")
         .replace("python_voice_coding_plugin.types", "")
         .replace("python_voice_coding_plugin", "root")
+        .replace("pygls", "glass")
     )
 
     s = speakit.split_symbol(x)
-    s = " ".join([(x.upper() if len(x) in [2, 3] else x) for x in s.split()])
+    s = " ".join([(x.upper() if len(x) in [2, 3] else x.lower()) for x in s.split()])
     return s
 
 
@@ -104,7 +105,7 @@ def with_prefix(prefix: str, name: jedi.api.classes.Name):
     return f"{prefix}{n}"
 
 
-default_levels = {"module": 1, "instance": 3, "variable": 3, "param": 3, "statement": 3}
+default_levels = {"module": 1, "instance": 2, "variable": 2, "param": 2, "statement": 2}
 
 
 @functools.lru_cache(maxsize=128)
@@ -142,22 +143,27 @@ def generate_nested(
     elif name.type == "instance":
         for n in instance_attributes(name.full_name, project):
             yield with_prefix(prefix, n)
-            if n.type in ["instance"]:
+            if (
+                n.type in ["instance", "variable", "statement", "param"]
+                and not name.name.startswith("_")
+                and not n.name.startswith("_")
+                and True
+            ):
                 yield from generate_nested(n, f"{prefix}.{n.name}", level - 1, project)
     elif name.type in ["variable", "statement", "param"]:
         for n in name.infer():
             yield from generate_nested(n, prefix, level, project)
     elif name.type == "function":
-        if "def " in name.get_line_code():
-            for n in name.defined_names():
-                yield with_prefix(prefix, n)
-                yield from generate_nested(n, n.name, None, project)
-
-    else:
         return
+        # if "def " in name.get_line_code():
+        #     for n in name.defined_names():
+        #         yield with_prefix(prefix, n)
+        #         yield from generate_nested(n, n.name, None, project)
+    elif name.type == "class" and name.name.endswith("Targets"):
+        #        return
         for n in name.defined_names():
             yield with_prefix(prefix, n)
-            yield from generate_nested(n, prefix, level - 1)
+        #     yield from generate_nested(n, prefix, level - 1)
 
 
 @functools.lru_cache()
@@ -181,7 +187,10 @@ def module_public_names(
 def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
     p = project.path / "pyproject.toml"
     data = toml.loads(p.read_text())
-    return data["tool"]["poetry"]["dependencies"].keys()
+    return (
+        data.get("project", {}).get("dependencies", [])
+        or data["tool"]["poetry"]["dependencies"].keys()
+    )
 
 
 @functools.lru_cache()
@@ -267,13 +276,15 @@ def get_modules(project: jedi.Project):
 
 
 @server.command("get_spoken")
-def function(server: PyVoiceLanguageServer, doc_uri: str):
+def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
     server.show_message("Validating json...")
     document = server.workspace.get_document(doc_uri)
     s = jedi.Script(code=document.source, path=document.path, project=server.project)
     x = s.get_names()
     server.show_message(f"{len(x)}")
     output = []
+    keywords = []
+    l = [("", 0)]
     for n in x:
         output.append(with_prefix("", n))
         output.extend(
@@ -281,10 +292,42 @@ def function(server: PyVoiceLanguageServer, doc_uri: str):
                 n, n.name if n.type != "function" else "", None, server.project
             )
         )
+        for signature in n.get_signatures():
+            output.extend(p.name for p in signature.params)
+        l.append((f"{n.name}", len(output) - l[-1][1]))
+
+    server.show_message(f"no locals {len(output)} {pos}")
+    server.show_message(f"{l}")
+    if pos:
+        f = s.get_context(pos.line + 1, None)
+        server.show_message(f"{f}")
+
+        if f.type == "function":
+            # server.show_message(f"{f.defined_names()}")
+            for n in f.defined_names():
+                output.append(with_prefix("", n))
+                t = list(
+                    generate_nested(
+                        n, n.name if n.type != "function" else "", None, server.project
+                    )
+                )
+
+                output.extend(t)
+                output.extend(t)
+                if n.name == "description":
+                    server.show_message(f"{n} {t[:30]}")
+                l.append((f"{n.name}", len(output) - l[-1][1]))
+    server.show_message(f"with locals {len(output)}")
+    server.show_message(f"{l}")
 
     output = [x for x in sorted(set(output)) if "__" not in x]
-    server.show_message(len(output))
-    server.send_voice("enhance", speak_items(output))
+    keywords = [x for x in sorted(set(keywords)) if "__" not in x]
+    server.show_message(f"Final {len(output)}")
+    server.show_message(f"Final {keywords}")
+    if len(output) < 2000:
+        d = speak_items(output)
+        d.update({k + " equals": v + "=" for k, v in speak_items(keywords).items()})
+        server.send_voice("enhance", d)
     server.send_voice("enhance_import", get_modules(server.project))
 
 
