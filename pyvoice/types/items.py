@@ -12,7 +12,7 @@ class SpokenKind(enum.Flag):
 
 
 class SpokenItem(Model):
-    """denied him look can be spoken"""
+    """item that can be spoken"""
 
     spoken: str = ""
     kind: SpokenKind

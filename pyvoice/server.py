@@ -1,26 +1,32 @@
 import functools
 import re
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence, Union
+from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union
 
 import jedi
 import libcst as cst
-import speakit
 import toml
 from importlib_metadata import Distribution
 from jedi.inference.names import ImportName, SubModuleName
 from libcst import codemod as transformations
 from pydantic import validate_arguments
 from pygls import protocol
-from pygls.lsp.methods import INITIALIZE
-from pygls.lsp.types import InitializeParams, InitializeResult, Position, WorkspaceEdit
+from pygls.lsp.methods import INITIALIZE, WORKSPACE_DID_CHANGE_CONFIGURATION
+from pygls.lsp.types import (
+    DidChangeConfigurationParams,
+    InitializeParams,
+    InitializeResult,
+    Position,
+    WorkspaceEdit,
+)
 from pygls.protocol import LanguageServerProtocol, lsp_method
 from pygls.server import LanguageServer
+from requirements_detector import find_requirements
+
 from pyvoice.types.items import ModuleItem
 
 from .text_edit_utils import lsp_text_edits
 
-# you code new codeproject.get_environment()
 protocol.deserialize_command = lambda p: p
 F = TypeVar("F", bound=Callable)
 
@@ -29,9 +35,10 @@ class MyProtocol(LanguageServerProtocol):
     @lsp_method(INITIALIZE)
     def lsp_initialize(self, params: InitializeParams) -> InitializeResult:
         x = super().lsp_initialize(params)
+        venv_path = Path(self._server.workspace.root_path) / ".venv"
         self._server.project = jedi.Project(
             self._server.workspace.root_path,
-            environment_path=Path(self._server.workspace.root_path) / ".venv",
+            environment_path=venv_path if venv_path.exists() else None,
         )
         return x
 
@@ -74,28 +81,65 @@ class PyVoiceLanguageServer(LanguageServer):
 
 server = PyVoiceLanguageServer(protocol_cls=MyProtocol)
 
-# server.workspace
 
-
-def speak_single_item(x):
-    if re.match(r"[A-Z_]+", x):
-        x = x.lower().replace("_", " ")
-    x = (
-        x.replace("python_voice_coding_plugin.typing", "")
-        .replace("python_voice_coding_plugin.types", "")
-        .replace("python_voice_coding_plugin", "root")
-        .replace("pygls", "glass")
+@server.feature("workspace/didChangeConfiguration")
+def workspace_did_change_configuration(
+    ls: PyVoiceLanguageServer, params: DidChangeConfigurationParams
+):
+    venv_path = params.settings.get("venvPath", ".venv")
+    venv_path = Path(venv_path) if venv_path else None
+    if venv_path and not venv_path.is_absolute():
+        venv_path = Path(ls.workspace.root_path) / venv_path
+    ls.show_message("Validating Did change configuration...{}".format(venv_path))
+    ls.project = jedi.Project(
+        ls.workspace.root_path,
+        environment_path=venv_path if venv_path.exists() else None,
     )
 
-    s = speakit.split_symbol(x)
-    s = " ".join([(x.upper() if len(x) in [2, 3] else x.lower()) for x in s.split()])
-    return s
+
+# def speak_single_item(x):
+#     if re.match(r"[A-Z_]+", x):
+#         x = x.lower().replace("_", " ")
+#     s = speakit.split_symbol(x)
+#     s = " ".join([(x.upper() if len(x) in [2, 3] else x.lower()) for x in s.split()])
+#     return s
+
+
+# lets rewrite this
+
+# pattern = re.compile(r"\W+")
+
+pattern = re.compile(r"[A-Z][a-z]+|[A-Z]+|[a-z]+|\d")
+digits_to_names = {
+    "0": "zero",
+    "1": "one",
+    "2": "two",
+    "3": "three",
+    "4": "four",
+    "5": "fife",
+    "6": "six",
+    "7": "seven",
+    "8": "eight",
+    "9": "nine",
+}
+
+
+@functools.lru_cache(maxsize=8192)
+def speak_single_item(text):
+    return " ".join(
+        [
+            digits_to_names.get(w, w.upper() if len(w) < 3 else w.lower())
+            for w in pattern.findall(text)
+            if w
+        ]
+    )
 
 
 def speak_items(l):
     return {speak_single_item(x): x for x in l}
 
 
+@functools.lru_cache(maxsize=512)
 def with_prefix(prefix: str, name: jedi.api.classes.Name):
     if prefix:
         prefix = prefix + "."
@@ -119,6 +163,8 @@ import {full_name.split('.')[0]}
 _ : {full_name}
 _."""
     s = jedi.Script(text, project=project)
+    if hasattr(project, "_inference_state"):
+        s._inference_state = project._inference_state
     return [
         x
         for x in s.complete()
@@ -126,6 +172,7 @@ _."""
     ]
 
 
+# @functools.lru_cache(maxsize=128)
 def generate_nested(
     name: jedi.api.classes.Name,
     prefix: str,
@@ -137,6 +184,8 @@ def generate_nested(
     if level <= 0:
         return
     if name.type == "module":
+        if name.name == "pytest":
+            level += 1
         for n in module_public_names(project, name.full_name):
             yield with_prefix(prefix, n)
             yield from generate_nested(n, prefix, level - 1)
@@ -171,6 +220,7 @@ def ignored_names(project: jedi.Project):
     return {x.full_name for x in jedi.Script("", project=project).complete()}
 
 
+@functools.lru_cache(maxsize=128)
 def module_public_names(
     project: jedi.Project, module_name: str
 ) -> Sequence[jedi.api.classes.BaseName]:
@@ -187,10 +237,13 @@ def module_public_names(
 def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
     p = project.path / "pyproject.toml"
     data = toml.loads(p.read_text())
-    return (
-        data.get("project", {}).get("dependencies", [])
-        or data["tool"]["poetry"]["dependencies"].keys()
-    )
+    try:
+        return (
+            data.get("project", {}).get("dependencies", [])
+            or data["tool"]["poetry"]["dependencies"].keys()
+        )
+    except:
+        return [x.name for x in find_requirements(project.path)]
 
 
 @functools.lru_cache()
@@ -221,6 +274,7 @@ def get_top_level_dependencies_modules(project: jedi.Project):
     ]
 
 
+@functools.lru_cache()
 def relative_path_to_item(x: Path) -> ModuleItem:
     if x.name == "__init__.py":
         return relative_path_to_item(x.parent)
@@ -248,6 +302,8 @@ def get_builtin_modules(project: jedi.Project):
             "importlib_metadata",
             "enum",
             "pathlib",
+            "datetime",
+            "itertools",
             "python_voice_coding_plugin.typing",
             "python_voice_coding_plugin.types",
         ]
@@ -277,11 +333,14 @@ def get_modules(project: jedi.Project):
 
 @server.command("get_spoken")
 def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
-    server.show_message("Validating json...")
     document = server.workspace.get_document(doc_uri)
     s = jedi.Script(code=document.source, path=document.path, project=server.project)
+    if hasattr(server.project, "_inference_state"):
+        s._inference_state = server.project._inference_state
+    else:
+        server.project._inference_state = s._inference_state
     x = s.get_names()
-    server.show_message(f"{len(x)}")
+    # server.show_message(f"{len(x)}")
     output = []
     keywords = []
     l = [("", 0)]
@@ -296,11 +355,11 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
             output.extend(p.name for p in signature.params)
         l.append((f"{n.name}", len(output) - l[-1][1]))
 
-    server.show_message(f"no locals {len(output)} {pos}")
-    server.show_message(f"{l}")
+    # server.show_message(f"no locals {len(output)} {pos}")
+    # server.show_message(f"{l}")
     if pos:
         f = s.get_context(pos.line + 1, None)
-        server.show_message(f"{f}")
+        # server.show_message(f"{f}")
 
         if f.type == "function":
             # server.show_message(f"{f.defined_names()}")
@@ -314,21 +373,30 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
 
                 output.extend(t)
                 output.extend(t)
-                if n.name == "description":
-                    server.show_message(f"{n} {t[:30]}")
+                # if n.name == "description":
+                #     server.show_message(f"{n} {t[:30]}")
                 l.append((f"{n.name}", len(output) - l[-1][1]))
-    server.show_message(f"with locals {len(output)}")
-    server.show_message(f"{l}")
-
+    # server.show_message(f"with locals {len(output)}")
+    # server.show_message(f"{l}")
     output = [x for x in sorted(set(output)) if "__" not in x]
     keywords = [x for x in sorted(set(keywords)) if "__" not in x]
-    server.show_message(f"Final {len(output)}")
-    server.show_message(f"Final {keywords}")
+    # server.show_message(f"Final {keywords}")
     if len(output) < 2000:
-        d = speak_items(output)
-        d.update({k + " equals": v + "=" for k, v in speak_items(keywords).items()})
-        server.send_voice("enhance", d)
-    server.send_voice("enhance_import", get_modules(server.project))
+        output = output[:2000]
+    d = speak_items(output)
+    d.update({k + " equals": v + "=" for k, v in speak_items(keywords).items()})
+    d.update({f"{n.type} {n.name}": n.name for n in x})
+    imp = get_modules(server.project)
+    server.send_voice("enhance_spoken", "importable", imp)
+    server.send_voice(
+        "enhance_spoken",
+        "expression",
+        [{"spoken": k, "value": v} for k, v in d.items()],
+    )
+    server.show_message(f"{len(output)} expressions, {len(imp)} imports")
+
+
+# op server.send_voice( )
 
 
 @server.command("add_import")
@@ -368,7 +436,7 @@ def function_from_import(server: PyVoiceLanguageServer, item: ModuleItem):
         ModuleItem(spoken=speak_single_item(x.name), module=module_name, name=x.name)
         for x in module_public_names(server.project, module_name)
     ]
-    server.send_voice("enhance_from_import", s)
+    server.send_voice("enhance_spoken", "subsymbol", s)
 
 
 def module_public_names_fuzzy(
@@ -410,7 +478,5 @@ def function_from_import_fuzzy(
     server.show_message(f"{choices}")
     items = [ModuleItem(spoken="", module=module_name, name=x.name) for x in chosen]
     function_add_import(server, doc_uri, items)
-    # server.send_voice("enhance_from_import", s)
-
-
-# b
+    # server.send_voice("enhance_from_import", s) server.send_voice()
+    # "pyvoice.types""pathlib.Path"
