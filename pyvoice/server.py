@@ -1,5 +1,6 @@
 import functools
 import re
+import sys
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union
 
@@ -235,9 +236,9 @@ def module_public_names(
 
 
 def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
-    p = project.path / "pyproject.toml"
-    data = toml.loads(p.read_text())
     try:
+        p = project.path / "pyproject.toml"
+        data = toml.loads(p.read_text())
         return (
             data.get("project", {}).get("dependencies", [])
             or data["tool"]["poetry"]["dependencies"].keys()
@@ -318,9 +319,11 @@ def get_builtin_modules(project: jedi.Project):
 def get_modules(project: jedi.Project):
     output = [
         relative_path_to_item(x)
+        for y in project.path.iterdir()
+        if not y.name.startswith(".")
         for x in map(
             lambda p: p.relative_to(project.path),
-            Path(project.path).glob("[!.]*\\**\\*.py"),
+            Path(y).glob("\\**\\*.py" if sys.platform == "win32" else "**/*.py"),
         )
         if len(x.parts) > 1 and "." not in x.parts[0]
     ]
