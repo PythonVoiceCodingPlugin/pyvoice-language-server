@@ -244,7 +244,10 @@ def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
             or data["tool"]["poetry"]["dependencies"].keys()
         )
     except:
-        return [x.name for x in find_requirements(project.path)]
+        try:
+            return [x.name for x in find_requirements(project.path)]
+        except RequirementsNotFound:
+            return []
 
 
 @functools.lru_cache()
@@ -273,6 +276,9 @@ def get_top_level_dependencies_modules(project: jedi.Project):
         for dependency_name in get_top_level_dependencies_names(project)
         for x in get_modules_from_distribution(project, dependency_name)
     ]
+
+
+from requirements_detector.exceptions import RequirementsNotFound
 
 
 @functools.lru_cache()
