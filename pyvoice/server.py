@@ -311,8 +311,6 @@ def get_builtin_modules(project: jedi.Project):
             "pathlib",
             "datetime",
             "itertools",
-            "python_voice_coding_plugin.typing",
-            "python_voice_coding_plugin.types",
         ]
         for name in module_public_names(project, x)
     ]
