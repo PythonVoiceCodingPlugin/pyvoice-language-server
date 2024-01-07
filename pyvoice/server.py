@@ -320,19 +320,28 @@ def get_builtin_modules(project: jedi.Project):
 # server project Environmentserver.a
 
 
-def get_modules(project: jedi.Project):
+def get_project_modules(project: jedi.Project):
+    return _get_project_modules_cached(project, project.path.stat().st_mtime)
+
+
+@functools.lru_cache(maxsize=8)
+def _get_project_modules_cached(project: jedi.Project, last_modified):
     output = [
         relative_path_to_item(x)
         for y in project.path.iterdir()
-        if not y.name.startswith(".")
+        if not y.name.startswith(".") and y.is_dir()
         for x in map(
             lambda p: p.relative_to(project.path),
-            Path(y).glob("\\**\\*.py" if sys.platform == "win32" else "**/*.py"),
+            Path(y).glob("**/*.py"),
         )
         if len(x.parts) > 1 and "." not in x.parts[0]
     ]
+    return output
+
+
+def get_modules(project: jedi.Project):
     return (
-        output
+        get_project_modules(project)
         + get_builtin_modules(project)
         + get_top_level_dependencies_modules(project)
     )
