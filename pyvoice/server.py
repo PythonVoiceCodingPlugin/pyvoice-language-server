@@ -355,12 +355,12 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
         s._inference_state = server.project._inference_state
     else:
         server.project._inference_state = s._inference_state
-    x = s.get_names()
-    # server.show_message(f"{len(x)}")
+    imp = get_modules(server.project)
+    server.send_voice("enhance_spoken", "importable", imp)
+
+    global_names = s.get_names()
     output = []
-    keywords = []
-    l = [("", 0)]
-    for n in x:
+    for n in global_names:
         output.append(with_prefix("", n))
         output.extend(
             generate_nested(
@@ -369,16 +369,9 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
         )
         for signature in n.get_signatures():
             output.extend(p.name for p in signature.params)
-        l.append((f"{n.name}", len(output) - l[-1][1]))
-
-    # server.show_message(f"no locals {len(output)} {pos}")
-    # server.show_message(f"{l}")
     if pos:
         f = s.get_context(pos.line + 1, None)
-        # server.show_message(f"{f}")
-
         if f.type == "function":
-            # server.show_message(f"{f.defined_names()}")
             for n in f.defined_names():
                 output.append(with_prefix("", n))
                 t = list(
@@ -386,24 +379,11 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
                         n, n.name if n.type != "function" else "", None, server.project
                     )
                 )
-
                 output.extend(t)
-                output.extend(t)
-                # if n.name == "description":
-                #     server.show_message(f"{n} {t[:30]}")
-                l.append((f"{n.name}", len(output) - l[-1][1]))
-    # server.show_message(f"with locals {len(output)}")
-    # server.show_message(f"{l}")
     output = [x for x in sorted(set(output)) if "__" not in x]
-    keywords = [x for x in sorted(set(keywords)) if "__" not in x]
-    # server.show_message(f"Final {keywords}")
     if len(output) < 2000:
         output = output[:2000]
     d = speak_items(output)
-    d.update({k + " equals": v + "=" for k, v in speak_items(keywords).items()})
-    d.update({f"{n.type} {n.name}": n.name for n in x})
-    imp = get_modules(server.project)
-    server.send_voice("enhance_spoken", "importable", imp)
     server.send_voice(
         "enhance_spoken",
         "expression",
