@@ -376,16 +376,18 @@ def get_modules(project: jedi.Project):
 
 
 @server.command("get_spoken")
-def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
+def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None, generate_importables:bool=True):
     document = server.workspace.get_document(doc_uri)
     s = jedi.Script(code=document.source, path=document.path, project=server.project)
     if hasattr(server.project, "_inference_state"):
         s._inference_state = server.project._inference_state
     else:
         server.project._inference_state = s._inference_state
-    imp = get_modules(server.project)
-    server.send_voice("enhance_spoken", "importable", imp)
-
+    if generate_importables:
+        imp = get_modules(server.project)
+        server.send_voice("enhance_spoken", "importable", imp)
+    else:
+        imp = None
     global_names = s.get_names()
     output = []
     for n in global_names:
@@ -416,7 +418,11 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
         "expression",
         [{"spoken": k, "value": v} for k, v in d.items()],
     )
-    server.show_message(f"{len(output)} expressions, {len(imp)} imports")
+    if imp  is  not None:
+        server.show_message(f"{len(output)} expressions, {len(imp)} imports")
+    else:
+        server.show_message(f"{len(output)} expressions, skipped imports")
+
 
 
 # op server.send_voice( )
