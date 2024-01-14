@@ -347,13 +347,8 @@ def get_builtin_modules(project: jedi.Project):
 
 # server project Environmentserver.a
 
-
+@cached(cache=LRUCache(maxsize=4), key=lambda project: (project, project.path.stat().st_mtime))
 def get_project_modules(project: jedi.Project):
-    return _get_project_modules_cached(project, project.path.stat().st_mtime)
-
-
-@functools.lru_cache(maxsize=8)
-def _get_project_modules_cached(project: jedi.Project, last_modified):
     output = [
         relative_path_to_item(x)
         for y in project.path.iterdir()
