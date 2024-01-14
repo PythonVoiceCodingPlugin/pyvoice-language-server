@@ -236,6 +236,14 @@ def _generate_nested(
         #     yield from generate_nested(n, prefix, level - 1)
 
 
+@cached(cache=LRUCache(maxsize=512 * 4), key=lambda n: n.full_name)
+def get_keyword_names(n: jedi.api.classes.Name):
+    output = []
+    for signature in n.get_signatures():
+        output.extend(p.name for p in signature.params)
+    return output
+
+
 @functools.lru_cache()
 def ignored_names(project: jedi.Project):
     return {x.full_name for x in jedi.Script("", project=project).complete()}
@@ -387,8 +395,7 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None):
                 n, n.name if n.type != "function" else "", None, server.project
             )
         )
-        for signature in n.get_signatures():
-            output.extend(p.name for p in signature.params)
+        output.extend(get_keyword_names(n))
     if pos:
         f = s.get_context(pos.line + 1, None)
         if f.type == "function":
