@@ -1,8 +1,8 @@
 import functools
 import re
-import sys
+import sys  # noqa
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union
+from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union  # noqa
 
 import jedi
 import libcst as cst
@@ -10,16 +10,16 @@ import toml
 from importlib_metadata import Distribution
 from jedi.inference.names import ImportName, SubModuleName
 from libcst import codemod as transformations
-from pydantic import validate_arguments
-from pygls import protocol
-from pygls.lsp.methods import INITIALIZE, WORKSPACE_DID_CHANGE_CONFIGURATION
-from pygls.lsp.types import (
+from lsprotocol.types import (
+    INITIALIZE,
+    WORKSPACE_DID_CHANGE_CONFIGURATION,
     DidChangeConfigurationParams,
     InitializeParams,
     InitializeResult,
     Position,
     WorkspaceEdit,
 )
+from pygls import protocol
 from pygls.protocol import LanguageServerProtocol, lsp_method
 from pygls.server import LanguageServer
 from requirements_detector import find_requirements
@@ -47,11 +47,6 @@ class MyProtocol(LanguageServerProtocol):
 class PyVoiceLanguageServer(LanguageServer):
     project: jedi.Project
 
-    def __init__(
-        self, loop=None, protocol_cls=LanguageServerProtocol, max_workers: int = 2
-    ):
-        super().__init__(loop, protocol_cls, max_workers)
-
     def command(
         self, command_name: str
     ) -> Callable[[F], Callable[["PyVoiceLanguageServer", Any], Any]]:
@@ -64,10 +59,20 @@ class PyVoiceLanguageServer(LanguageServer):
         """
 
         def wrapper(f: F):
-            f = validate_arguments(config=dict(arbitrary_types_allowed=True))(f)
+            import inspect
+
+            # import cattrs
+            # # from lsprotocol.converters import get_converter
+            # c = cattrs.Converter()
 
             def function(server: PyVoiceLanguageServer, args):
-                return f(server, *args)
+                f_args = list(inspect.signature(f).parameters.values())[1:]
+                new_args = [
+                    server.lsp._converter.structure(value, arg_type.annotation)
+                    for arg_type, value in zip(f_args, args)
+                ]
+                # raise ValueError(f"{f_args} {args} {new_args}")
+                return f(server, *new_args)
 
             self.lsp.fm.command(command_name)(function)
             return f
@@ -80,7 +85,9 @@ class PyVoiceLanguageServer(LanguageServer):
         )
 
 
-server = PyVoiceLanguageServer(protocol_cls=MyProtocol)
+server = PyVoiceLanguageServer(
+    name="pyvoice", version="0.0.0a2", protocol_cls=MyProtocol
+)
 
 
 @server.feature("workspace/didChangeConfiguration")
@@ -347,7 +354,11 @@ def get_builtin_modules(project: jedi.Project):
 
 # server project Environmentserver.a
 
-@cached(cache=LRUCache(maxsize=4), key=lambda project: (project, project.path.stat().st_mtime))
+
+@cached(
+    cache=LRUCache(maxsize=4),
+    key=lambda project: (project, project.path.stat().st_mtime),
+)
 def get_project_modules(project: jedi.Project):
     output = [
         relative_path_to_item(x)
@@ -371,7 +382,12 @@ def get_modules(project: jedi.Project):
 
 
 @server.command("get_spoken")
-def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None, generate_importables:bool=True):
+def function(
+    server: PyVoiceLanguageServer,
+    doc_uri: str,
+    pos: Position = None,
+    generate_importables: bool = True,
+):
     document = server.workspace.get_document(doc_uri)
     s = jedi.Script(code=document.source, path=document.path, project=server.project)
     if hasattr(server.project, "_inference_state"):
@@ -413,11 +429,10 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None, 
         "expression",
         [{"spoken": k, "value": v} for k, v in d.items()],
     )
-    if imp  is  not None:
+    if imp is not None:
         server.show_message(f"{len(output)} expressions, {len(imp)} imports")
     else:
         server.show_message(f"{len(output)} expressions, skipped imports")
-
 
 
 # op server.send_voice( )
@@ -427,7 +442,8 @@ def function(server: PyVoiceLanguageServer, doc_uri: str, pos: Position = None, 
 def function_add_import(
     server: PyVoiceLanguageServer,
     doc_uri: str,
-    items: Union[ModuleItem, List[ModuleItem]],
+    items: ModuleItem
+    # items: Union[ModuleItem, List[ModuleItem]],
 ):
     server.show_message(f"{items}")
     document = server.workspace.get_document(doc_uri)

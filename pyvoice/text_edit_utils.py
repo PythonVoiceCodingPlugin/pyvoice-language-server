@@ -13,17 +13,8 @@ import difflib
 from bisect import bisect_right
 from typing import List, NamedTuple
 
-from pygls.lsp.types import (
-    Position,
-    Range,
-    RenameFile,
-    RenameFileOptions,
-    ResourceOperationKind,
-    TextDocumentEdit,
-    TextEdit,
-    VersionedTextDocumentIdentifier,
-)
-from pygls.workspace import Document, Workspace
+from lsprotocol.types import Position, Range, TextEdit
+from pygls.workspace import Document
 
 
 def is_valid_python(code: str) -> bool:

@@ -1,25 +1,25 @@
 import enum
-from enum import Enum, Flag
-from typing import Iterable, Optional, Sequence
+from typing import Optional
 
-from pydantic import dataclasses
-
-from .models import Model
+import attrs
 
 
 class SpokenKind(enum.Flag):
     IMPORTABLE = enum.auto()
 
 
-class SpokenItem(Model):
-    """item that can be spoken"""
+# @attrs.define
+# class SpokenItem():
+#     """item that can be spoken"""
 
-    spoken: str = ""
-    kind: SpokenKind
+#     kind: SpokenKind
+#     spoken: str = attrs.field(default="")
 
 
-class ModuleItem(SpokenItem):
-    kind = SpokenKind.IMPORTABLE
+@attrs.define
+class ModuleItem:
+    spoken: str
     module: str
-    name: Optional[str]
-    asname: Optional[str]
+    name: Optional[str] = attrs.field(default=None)
+    asname: Optional[str] = attrs.field(default=None)
+    kind: SpokenKind = attrs.field(default=SpokenKind.IMPORTABLE)
