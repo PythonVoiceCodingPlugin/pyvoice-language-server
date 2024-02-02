@@ -410,7 +410,7 @@ def function(
         )
         output.extend(get_keyword_names(n))
     if pos:
-        f = s.get_context(pos.line + 1, None)
+        f = s.get_context(pos.line + 1, pos.character)
         if f.type == "function":
             for n in f.defined_names():
                 output.append(with_prefix("", n))
