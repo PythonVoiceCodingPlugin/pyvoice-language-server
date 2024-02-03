@@ -23,6 +23,7 @@ from pygls import protocol
 from pygls.protocol import LanguageServerProtocol, lsp_method
 from pygls.server import LanguageServer
 from requirements_detector import find_requirements
+from requirements_detector.exceptions import RequirementsNotFound
 
 from pyvoice.types.items import ModuleItem
 
@@ -315,7 +316,6 @@ def get_top_level_dependencies_modules(project: jedi.Project):
     ]
 
 
-from requirements_detector.exceptions import RequirementsNotFound
 
 
 @functools.lru_cache()
@@ -354,7 +354,6 @@ def get_builtin_modules(project: jedi.Project):
     return output
 
 
-# server project Environmentserver.a
 
 
 @cached(
