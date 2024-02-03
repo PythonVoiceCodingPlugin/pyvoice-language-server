@@ -261,11 +261,13 @@ def module_public_names(
     project: jedi.Project, module_name: str
 ) -> Sequence[jedi.api.classes.BaseName]:
     ignore = ignored_names(project)
+    small_script = jedi.Script(f"from {module_name} import ", project=project)
+    if hasattr(project, "_inference_state"):
+        small_script._inference_state = project._inference_state
+
     return [
         name
-        for name in jedi.Script(
-            f"from {module_name} import *\n", project=project
-        ).complete()
+        for name in small_script.complete()
         if name.full_name not in ignore and name.full_name
     ]
 
