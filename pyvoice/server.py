@@ -1,8 +1,19 @@
 import functools
+import itertools
 import re
 import sys  # noqa
 from pathlib import Path
-from typing import Any, Callable, List, Optional, Sequence, TypeVar, Union  # noqa
+from typing import (  # noqa
+    Any,
+    Callable,
+    List,
+    Mapping,
+    Optional,
+    Sequence,
+    Tuple,
+    TypeVar,
+    Union,
+)
 
 import jedi
 import libcst as cst
@@ -42,6 +53,7 @@ class MyProtocol(LanguageServerProtocol):
             self._server.workspace.root_path,
             environment_path=venv_path if venv_path.exists() else None,
         )
+        self._server.extra_subsymbols = {}
         return x
 
 
@@ -91,6 +103,16 @@ server = PyVoiceLanguageServer(
 )
 
 
+def _dotted_dict_to_normal(d: dict, prefix=""):
+    output = {}
+    for k, v in d.items():
+        if isinstance(v, dict):
+            output.update(_dotted_dict_to_normal(v, f"{prefix}{k}."))
+        else:
+            output[f"{prefix}{k}"] = v
+    return output
+
+
 @server.feature("workspace/didChangeConfiguration")
 def workspace_did_change_configuration(
     ls: PyVoiceLanguageServer, params: DidChangeConfigurationParams
@@ -104,6 +126,12 @@ def workspace_did_change_configuration(
         ls.workspace.root_path,
         environment_path=venv_path if venv_path.exists() else None,
     )
+    ls.extra_subsymbols = params.settings.get("extraSubsymbols", {})
+    ls.extra_subsymbols = _dotted_dict_to_normal(ls.extra_subsymbols)
+    ls.extra_subsymbols = tuple(
+        (k, v) for k, v in ls.extra_subsymbols.items() if v is not None
+    )
+    ls.show_message(f"Extra subsymbols: {ls.extra_subsymbols}")
 
 
 # def speak_single_item(x):
@@ -316,8 +344,6 @@ def get_top_level_dependencies_modules(project: jedi.Project):
     ]
 
 
-
-
 @functools.lru_cache()
 def relative_path_to_item(x: Path) -> ModuleItem:
     if x.name == "__init__.py":
@@ -336,24 +362,28 @@ def relative_path_to_item(x: Path) -> ModuleItem:
 
 
 @functools.lru_cache()
-def get_builtin_modules(project: jedi.Project):
+def get_stdlib_modules(project: jedi.Project):
+    return [
+        ModuleItem(spoken=speak_single_item(x), module=x, name=None)
+        for x in sys.stdlib_module_names
+        if not x.startswith("_")
+    ]
+
+
+@functools.lru_cache()
+def get_extra_subsymbols(
+    project: jedi.Project, key_value_pairs: Sequence[Tuple[str, str]]
+):
     output = [
         ModuleItem(
-            spoken=speak_single_item(f"{x} {name.name}"), module=x, name=name.name
+            spoken=speak_single_item(f"{spoken_prefix} {name.name}"),
+            module=module_name,
+            name=name.name,
         )
-        for x in [
-            "typing",
-            "importlib_metadata",
-            "enum",
-            "pathlib",
-            "datetime",
-            "itertools",
-        ]
-        for name in module_public_names(project, x)
+        for module_name, spoken_prefix in key_value_pairs
+        for name in module_public_names(project, module_name)
     ]
     return output
-
-
 
 
 @cached(
@@ -374,11 +404,16 @@ def get_project_modules(project: jedi.Project):
     return output
 
 
-def get_modules(project: jedi.Project):
-    return (
-        get_project_modules(project)
-        + get_builtin_modules(project)
-        + get_top_level_dependencies_modules(project)
+def get_modules(
+    project: jedi.Project, extra_subsymbols: Sequence[Tuple[str, str]]
+) -> List[ModuleItem]:
+    return list(
+        itertools.chain(
+            get_stdlib_modules(project),
+            get_top_level_dependencies_modules(project),
+            get_project_modules(project),
+            get_extra_subsymbols(project, extra_subsymbols),
+        )
     )
 
 
