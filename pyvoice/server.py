@@ -35,6 +35,7 @@ from pygls.protocol import LanguageServerProtocol, lsp_method
 from pygls.server import LanguageServer
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
+from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.types.items import ModuleItem
 
@@ -365,7 +366,7 @@ def relative_path_to_item(x: Path) -> ModuleItem:
 def get_stdlib_modules(project: jedi.Project):
     return [
         ModuleItem(spoken=speak_single_item(x), module=x, name=None)
-        for x in sys.stdlib_module_names
+        for x in stdlib_module_names
         if not x.startswith("_")
     ]
 
