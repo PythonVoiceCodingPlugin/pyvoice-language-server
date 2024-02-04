@@ -2,6 +2,7 @@ import functools
 import itertools
 import re
 import sys  # noqa
+from itertools import groupby
 from pathlib import Path
 from typing import (  # noqa
     Any,
@@ -16,11 +17,9 @@ from typing import (  # noqa
 )
 
 import jedi
-import libcst as cst
 import toml
 from importlib_metadata import Distribution
 from jedi.inference.names import ImportName, SubModuleName
-from libcst import codemod as transformations
 from lsprotocol.types import (
     INITIALIZE,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
@@ -30,6 +29,7 @@ from lsprotocol.types import (
     Position,
     WorkspaceEdit,
 )
+from parso import parse
 from pygls import protocol
 from pygls.protocol import LanguageServerProtocol, lsp_method
 from pygls.server import LanguageServer
@@ -472,6 +472,38 @@ def function(
 
 
 # op server.send_voice( )
+def add_imports_to_module(module, items: list[ModuleItem]) -> None:
+    """add import statements to a module"""
+    new_nodes = []
+    for module_name, values in groupby(items, lambda x: x.module):
+        values = list(values)
+        names = [
+            x.name if not x.asname else f"{x.name} as {x.asname}"
+            for x in values
+            if x.name
+        ]
+        if names:
+            new_nodes.append(
+                parse(f"from {module_name} import {', '.join(names)}\n").children[0]
+            )
+        if any(x.name is None for x in values):
+            new_nodes.append(parse(f"import {module_name}\n").children[0])
+    start = 0
+    try:
+        if module.children[0].children[0].type == "string":
+            start = 1
+    except (IndexError, AttributeError):
+        pass
+    for node in new_nodes:
+        node.parent = module
+        module.children.insert(start, node)
+
+
+def add_imports_to_code(code: str, items: list[ModuleItem]) -> str:
+    """add import statements to a code string"""
+    module = parse(code)
+    add_imports_to_module(module, items)
+    return module.get_code()
 
 
 @server.command("add_import")
@@ -483,18 +515,8 @@ def function_add_import(
 ):
     server.show_message(f"{items}")
     document = server.workspace.get_document(doc_uri)
-    wrapper = cst.MetadataWrapper(cst.parse_module(document.source))
-    context = transformations.CodemodContext(wrapper=wrapper)
-    items = items if isinstance(items, list) else [items]
-    transformer = transformations.visitors.AddImportsVisitor(  # type: ignore[attr-defined]
-        context,
-        [
-            transformations.visitors.ImportItem(item.module, item.name, item.asname)
-            for item in items
-        ],
-    )
-    result = transformations.transform_module(transformer, document.source)
-    edit = WorkspaceEdit(changes={doc_uri: lsp_text_edits(document, result.code)})
+    result = add_imports_to_code(document.source, items)
+    edit = WorkspaceEdit(changes={doc_uri: lsp_text_edits(document, result)})
     server.apply_edit(edit)
 
 

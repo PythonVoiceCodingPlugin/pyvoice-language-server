@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyvoice"
-version = "0.0.0.a2"
+version = "0.0.0.a4"
 description = "pyvoice"
 authors = ["mpourmpoulis <35875229+mpourmpoulis@users.noreply.github.com>"]
 license = "GPL-3.0"
@@ -22,7 +22,6 @@ python = "^3.8"
 click = "^8.0.1"
 pygls = "^1.2.1"
 jedi = "^0.18.1"
-libcst = "^0.4.1"
 importlib-metadata = "*"
 toml = "^0.10.2"
 requirements_detector = "1.0.3"
