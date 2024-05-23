@@ -1,5 +1,6 @@
 import functools
 import itertools
+import logging
 import re
 import sys  # noqa
 from itertools import groupby
@@ -18,8 +19,8 @@ from typing import (  # noqa
 
 import jedi
 import toml
+from cachetools import LRUCache, cached
 from importlib_metadata import Distribution
-from jedi.inference.names import ImportName, SubModuleName
 from lsprotocol.types import (
     INITIALIZE,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
@@ -43,6 +44,9 @@ from .text_edit_utils import lsp_text_edits
 
 protocol.deserialize_command = lambda p: p
 F = TypeVar("F", bound=Callable)
+
+
+logger = logging.getLogger(__name__)
 
 
 class MyProtocol(LanguageServerProtocol):
@@ -85,7 +89,6 @@ class PyVoiceLanguageServer(LanguageServer):
                     server.lsp._converter.structure(value, arg_type.annotation)
                     for arg_type, value in zip(f_args, args)
                 ]
-                # raise ValueError(f"{f_args} {args} {new_args}")
                 return f(server, *new_args)
 
             self.lsp.fm.command(command_name)(function)
@@ -114,7 +117,7 @@ def _dotted_dict_to_normal(d: dict, prefix=""):
     return output
 
 
-@server.feature("workspace/didChangeConfiguration")
+@server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
 def workspace_did_change_configuration(
     ls: PyVoiceLanguageServer, params: DidChangeConfigurationParams
 ):
@@ -173,8 +176,8 @@ def speak_single_item(text):
     )
 
 
-def speak_items(l):
-    return {speak_single_item(x): x for x in l}
+def speak_items(items_list):
+    return {speak_single_item(x): x for x in items_list}
 
 
 @functools.lru_cache(maxsize=512)
@@ -208,9 +211,6 @@ _."""
         for x in s.complete()
         if "__" not in x.name and "leave" not in x.name and "visit" not in x.name
     ]
-
-
-from cachetools import LRUCache, cached
 
 
 @cached(
@@ -310,7 +310,7 @@ def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
             data.get("project", {}).get("dependencies", [])
             or data["tool"]["poetry"]["dependencies"].keys()
         )
-    except:
+    except Exception:
         try:
             return [x.name for x in find_requirements(project.path)]
         except RequirementsNotFound:
@@ -333,7 +333,7 @@ def get_modules_from_distribution(
 
     except Exception:
         if name != "python":
-            raise ValueError(name)
+            raise ValueError(name) from None
         return []
 
 
@@ -467,6 +467,7 @@ def function(
         [{"spoken": k, "value": v} for k, v in d.items()],
     )
     if imp is not None:
+        logger.info(f"{len(output)} expressions, {len(imp)} imports")
         server.show_message(f"{len(output)} expressions, {len(imp)} imports")
     else:
         server.show_message(f"{len(output)} expressions, skipped imports")
@@ -511,7 +512,7 @@ def add_imports_to_code(code: str, items: list[ModuleItem]) -> str:
 def function_add_import(
     server: PyVoiceLanguageServer,
     doc_uri: str,
-    items: ModuleItem
+    items: ModuleItem,
     # items: Union[ModuleItem, List[ModuleItem]],
 ):
     server.show_message(f"{items}")

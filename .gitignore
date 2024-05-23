@@ -138,3 +138,8 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+
+# sublime stuff
+*.sublime-workspace
+*.sublime-project
