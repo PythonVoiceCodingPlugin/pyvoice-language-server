@@ -38,7 +38,7 @@ from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
 from stdlibs import module_names as stdlib_module_names
 
-from pyvoice.types.items import ModuleItem
+from pyvoice.types import ModuleItem
 
 from .text_edit_utils import lsp_text_edits
 

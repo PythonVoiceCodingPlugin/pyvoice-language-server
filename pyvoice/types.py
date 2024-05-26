@@ -8,14 +8,6 @@ class SpokenKind(enum.Flag):
     IMPORTABLE = enum.auto()
 
 
-# @attrs.define
-# class SpokenItem():
-#     """item that can be spoken"""
-
-#     kind: SpokenKind
-#     spoken: str = attrs.field(default="")
-
-
 @attrs.define
 class ModuleItem:
     spoken: str
