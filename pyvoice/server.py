@@ -418,6 +418,20 @@ def get_modules(
     )
 
 
+def get_scopes(script: jedi.Script, pos: Position):
+    scope = script.get_context(pos.line + 1, None)
+    while scope:
+        yield scope
+        scope = scope.parent()
+
+
+def pretty_scope_list(containing_scopes):
+    return " > ".join(
+        x.description if x.type != "module" else "mod " + x.full_name
+        for x in reversed(containing_scopes)
+    )
+
+
 @server.command("get_spoken")
 def function(
     server: PyVoiceLanguageServer,
@@ -447,16 +461,19 @@ def function(
         )
         output.extend(get_keyword_names(n))
     if pos:
-        f = s.get_context(pos.line + 1, pos.character)
-        if f.type == "function":
-            for n in f.defined_names():
-                output.append(with_prefix("", n))
-                t = list(
-                    generate_nested(
-                        n, n.name if n.type != "function" else "", None, server.project
+        containing_scopes = list(get_scopes(s, pos))
+        for scope in containing_scopes:
+            if scope.type == "function":
+                for n in scope.defined_names():
+                    output.append(with_prefix("", n))
+                    output.extend(
+                        generate_nested(
+                            n,
+                            n.name if n.type != "function" else "",
+                            None,
+                            server.project,
+                        )
                     )
-                )
-                output.extend(t)
     output = [x for x in sorted(set(output)) if "__" not in x]
     if len(output) < 2000:
         output = output[:2000]
@@ -466,11 +483,13 @@ def function(
         "expression",
         [{"spoken": k, "value": v} for k, v in d.items()],
     )
+    scope_message = "inside " + pretty_scope_list(containing_scopes) if pos else ""
     if imp is not None:
-        logger.info(f"{len(output)} expressions, {len(imp)} imports")
-        server.show_message(f"{len(output)} expressions, {len(imp)} imports")
+        logger.info(f"{len(imp)} imports, {len(output)} expressions {scope_message}")
+        # server.show_message(f"{len(output)} expressions, {len(imp)} imports")
     else:
-        server.show_message(f"{len(output)} expressions, skipped imports")
+        logger.info(f"{len(output)} expressions {scope_message}")
+        # server.show_message(f"{len(output)} expressions, skipped imports")
 
 
 # op server.send_voice( )
