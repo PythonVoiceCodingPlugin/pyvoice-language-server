@@ -38,6 +38,7 @@ from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
 from stdlibs import module_names as stdlib_module_names
 
+from pyvoice.project import Project
 from pyvoice.types import ModuleItem
 
 from .text_edit_utils import lsp_text_edits
@@ -54,7 +55,7 @@ class MyProtocol(LanguageServerProtocol):
     def lsp_initialize(self, params: InitializeParams) -> InitializeResult:
         x = super().lsp_initialize(params)
         venv_path = Path(self._server.workspace.root_path) / ".venv"
-        self._server.project = jedi.Project(
+        self._server.project = Project(
             self._server.workspace.root_path,
             environment_path=venv_path if venv_path.exists() else None,
         )
@@ -63,7 +64,7 @@ class MyProtocol(LanguageServerProtocol):
 
 
 class PyVoiceLanguageServer(LanguageServer):
-    project: jedi.Project
+    project: Project
 
     def command(
         self, command_name: str
@@ -126,7 +127,7 @@ def workspace_did_change_configuration(
     if venv_path and not venv_path.is_absolute():
         venv_path = Path(ls.workspace.root_path) / venv_path
     ls.show_message("Validating Did change configuration...{}".format(venv_path))
-    ls.project = jedi.Project(
+    ls.project = Project(
         ls.workspace.root_path,
         environment_path=venv_path if venv_path.exists() else None,
     )
@@ -195,7 +196,7 @@ default_levels = {"module": 1, "instance": 2, "variable": 2, "param": 2, "statem
 
 @functools.lru_cache(maxsize=128)
 def instance_attributes(
-    full_name: str, project: jedi.Project
+    full_name: str, project: Project
 ) -> Sequence[jedi.api.classes.BaseName]:
     if full_name is None:
         return []
@@ -226,7 +227,7 @@ def generate_nested(
     name: jedi.api.classes.Name,
     prefix: str,
     level: Optional[int] = None,
-    project: Optional[jedi.Project] = None,
+    project: Optional[Project] = None,
 ):
     return list(_generate_nested(name, prefix, level, project))
 
@@ -235,7 +236,7 @@ def _generate_nested(
     name: jedi.api.classes.Name,
     prefix: str,
     level: Optional[int] = None,
-    project: Optional[jedi.Project] = None,
+    project: Optional[Project] = None,
 ):
     if level is None:
         level = default_levels.get(name.type, 1)
@@ -282,18 +283,19 @@ def get_keyword_names(n: jedi.api.classes.Name):
 
 
 @functools.lru_cache()
-def ignored_names(project: jedi.Project):
+def ignored_names(project: Project):
     return {x.full_name for x in jedi.Script("", project=project).complete()}
 
 
 @functools.lru_cache(maxsize=128)
 def module_public_names(
-    project: jedi.Project, module_name: str
+    project: Project, module_name: str
 ) -> Sequence[jedi.api.classes.BaseName]:
     ignore = ignored_names(project)
-    small_script = jedi.Script(f"from {module_name} import ", project=project)
-    if hasattr(project, "_inference_state"):
-        small_script._inference_state = project._inference_state
+    small_script = project.get_script(
+        code=f"from {module_name} import *\n",
+    )
+>>>>>>> 568b51b... create dedicated custom project class
 
     return [
         name
@@ -302,7 +304,7 @@ def module_public_names(
     ]
 
 
-def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
+def get_top_level_dependencies_names(project: Project) -> Sequence[str]:
     try:
         p = project.path / "pyproject.toml"
         data = toml.loads(p.read_text())
@@ -318,9 +320,7 @@ def get_top_level_dependencies_names(project: jedi.Project) -> Sequence[str]:
 
 
 @functools.lru_cache()
-def get_modules_from_distribution(
-    project: jedi.Project, name: str
-) -> Sequence[ModuleItem]:
+def get_modules_from_distribution(project: Project, name: str) -> Sequence[ModuleItem]:
     try:
         return [
             relative_path_to_item(f)
@@ -337,7 +337,7 @@ def get_modules_from_distribution(
         return []
 
 
-def get_top_level_dependencies_modules(project: jedi.Project):
+def get_top_level_dependencies_modules(project: Project):
     return [
         x
         for dependency_name in get_top_level_dependencies_names(project)
@@ -363,7 +363,7 @@ def relative_path_to_item(x: Path) -> ModuleItem:
 
 
 @functools.lru_cache()
-def get_stdlib_modules(project: jedi.Project):
+def get_stdlib_modules(project: Project):
     return [
         ModuleItem(spoken=speak_single_item(x), module=x, name=None)
         for x in stdlib_module_names
@@ -372,9 +372,7 @@ def get_stdlib_modules(project: jedi.Project):
 
 
 @functools.lru_cache()
-def get_extra_subsymbols(
-    project: jedi.Project, key_value_pairs: Sequence[Tuple[str, str]]
-):
+def get_extra_subsymbols(project: Project, key_value_pairs: Sequence[Tuple[str, str]]):
     output = [
         ModuleItem(
             spoken=speak_single_item(f"{spoken_prefix} {name.name}"),
@@ -391,7 +389,7 @@ def get_extra_subsymbols(
     cache=LRUCache(maxsize=4),
     key=lambda project: (project, project.path.stat().st_mtime),
 )
-def get_project_modules(project: jedi.Project):
+def get_project_modules(project: Project):
     output = [
         relative_path_to_item(x)
         for y in project.path.iterdir()
@@ -406,7 +404,7 @@ def get_project_modules(project: jedi.Project):
 
 
 def get_modules(
-    project: jedi.Project, extra_subsymbols: Sequence[Tuple[str, str]]
+    project: Project, extra_subsymbols: Sequence[Tuple[str, str]]
 ) -> List[ModuleItem]:
     return list(
         itertools.chain(
@@ -440,13 +438,9 @@ def function(
     generate_importables: bool = True,
 ):
     document = server.workspace.get_document(doc_uri)
-    s = jedi.Script(code=document.source, path=document.path, project=server.project)
-    if hasattr(server.project, "_inference_state"):
-        s._inference_state = server.project._inference_state
-    else:
-        server.project._inference_state = s._inference_state
+    s = server.project.get_script(document=document)
     if generate_importables:
-        imp = get_modules(server.project)
+        imp = get_modules(server.project, server.extra_subsymbols)
         server.send_voice("enhance_spoken", "importable", imp)
     else:
         imp = None
@@ -559,7 +553,7 @@ def function_from_import(server: PyVoiceLanguageServer, item: ModuleItem):
 
 
 def module_public_names_fuzzy(
-    project: jedi.Project, current_path: str, module_name: str, name: str
+    project: Project, current_path: str, module_name: str, name: str
 ) -> Sequence[jedi.api.classes.BaseName]:
     ignore = ignored_names(project)
     return [
