@@ -204,12 +204,10 @@ def instance_attributes(
 import {full_name.split('.')[0]}
 _ : {full_name}
 _."""
-    s = jedi.Script(text, project=project)
-    if hasattr(project, "_inference_state"):
-        s._inference_state = project._inference_state
+    small_script = project.get_script(code=text)
     return [
         x
-        for x in s.complete()
+        for x in small_script.complete()
         if "__" not in x.name and "leave" not in x.name and "visit" not in x.name
     ]
 
