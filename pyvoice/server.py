@@ -1,7 +1,6 @@
 import functools
 import itertools
 import logging
-import re
 import sys  # noqa
 from itertools import groupby
 from pathlib import Path
@@ -39,6 +38,7 @@ from requirements_detector.exceptions import RequirementsNotFound
 from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.project import Project
+from pyvoice.speakify import speak_items, speak_single_item
 from pyvoice.types import ModuleItem
 
 from .text_edit_utils import lsp_text_edits
@@ -137,48 +137,6 @@ def workspace_did_change_configuration(
         (k, v) for k, v in ls.extra_subsymbols.items() if v is not None
     )
     ls.show_message(f"Extra subsymbols: {ls.extra_subsymbols}")
-
-
-# def speak_single_item(x):
-#     if re.match(r"[A-Z_]+", x):
-#         x = x.lower().replace("_", " ")
-#     s = speakit.split_symbol(x)
-#     s = " ".join([(x.upper() if len(x) in [2, 3] else x.lower()) for x in s.split()])
-#     return s
-
-
-# lets rewrite this
-
-# pattern = re.compile(r"\W+")
-
-pattern = re.compile(r"[A-Z][a-z]+|[A-Z]+|[a-z]+|\d")
-digits_to_names = {
-    "0": "zero",
-    "1": "one",
-    "2": "two",
-    "3": "three",
-    "4": "four",
-    "5": "fife",
-    "6": "six",
-    "7": "seven",
-    "8": "eight",
-    "9": "nine",
-}
-
-
-@functools.lru_cache(maxsize=8192)
-def speak_single_item(text):
-    return " ".join(
-        [
-            digits_to_names.get(w, w.upper() if len(w) < 3 else w.lower())
-            for w in pattern.findall(text)
-            if w
-        ]
-    )
-
-
-def speak_items(items_list):
-    return {speak_single_item(x): x for x in items_list}
 
 
 @functools.lru_cache(maxsize=512)
