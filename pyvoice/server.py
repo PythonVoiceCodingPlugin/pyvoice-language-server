@@ -21,17 +21,14 @@ import toml
 from cachetools import LRUCache, cached
 from importlib_metadata import Distribution
 from lsprotocol.types import (
-    INITIALIZE,
     WORKSPACE_DID_CHANGE_CONFIGURATION,
     DidChangeConfigurationParams,
-    InitializeParams,
-    InitializeResult,
     Position,
     WorkspaceEdit,
 )
 from parso import parse
 from pygls import protocol
-from pygls.protocol import LanguageServerProtocol, lsp_method
+from pygls.protocol import LanguageServerProtocol
 from pygls.server import LanguageServer
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
@@ -39,7 +36,7 @@ from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.project import Project
 from pyvoice.speakify import speak_items, speak_single_item
-from pyvoice.types import ModuleItem
+from pyvoice.types import ModuleItem, Settings
 
 from .text_edit_utils import lsp_text_edits
 
@@ -51,21 +48,20 @@ logger = logging.getLogger(__name__)
 
 
 class MyProtocol(LanguageServerProtocol):
-    @lsp_method(INITIALIZE)
-    def lsp_initialize(self, params: InitializeParams) -> InitializeResult:
-        x = super().lsp_initialize(params)
-        venv_path = Path(self._server.workspace.root_path) / ".venv"
-        self._server.project = Project(
-            self._server.workspace.root_path,
-            environment_path=venv_path if venv_path.exists() else None,
-        )
-        self._server.extra_subsymbols = {}
-        return x
+    # @lsp_method(INITIALIZE)
+    # def lsp_initialize(self, params: InitializeParams) -> InitializeResult:
+    #     x = super().lsp_initialize(params)
+    #     venv_path = Path(self._server.workspace.root_path) / ".venv"
+    #     self._server.project = Project(
+    #         self._server.workspace.root_path,
+    #         environment_path=venv_path if venv_path.exists() else None,
+    #     )
+    #     # self._server.extra_subsymbols = {}
+    #     return x
+    pass
 
 
 class PyVoiceLanguageServer(LanguageServer):
-    project: Project
-
     def command(
         self, command_name: str
     ) -> Callable[[F], Callable[["PyVoiceLanguageServer", Any], Any]]:
@@ -80,10 +76,6 @@ class PyVoiceLanguageServer(LanguageServer):
         def wrapper(f: F):
             import inspect
 
-            # import cattrs
-            # # from lsprotocol.converters import get_converter
-            # c = cattrs.Converter()
-
             def function(server: PyVoiceLanguageServer, args):
                 f_args = list(inspect.signature(f).parameters.values())[1:]
                 new_args = [
@@ -96,6 +88,24 @@ class PyVoiceLanguageServer(LanguageServer):
             return f
 
         return wrapper
+
+    @property
+    @cached(
+        cache=LRUCache(maxsize=8),
+        key=lambda self: (
+            self.workspace.root_path,
+            self.configuration_settings.project,
+        ),
+    )
+    def project(self) -> Project:
+        logger.warning("Calling %s", self.configuration_settings.project)
+        return Project.from_settings(
+            self.configuration_settings.project, Path(self.workspace.root_path)
+        )
+
+    @property
+    def configuration_settings(self) -> Settings:
+        return getattr(self, "_configuration_settings", Settings())
 
     def send_voice(self, command: str, *args, **kwargs):
         server.send_notification(
@@ -122,21 +132,10 @@ def _dotted_dict_to_normal(d: dict, prefix=""):
 def workspace_did_change_configuration(
     ls: PyVoiceLanguageServer, params: DidChangeConfigurationParams
 ):
-    venv_path = params.settings.get("venvPath", ".venv")
-    venv_path = Path(venv_path) if venv_path else None
-    if venv_path and not venv_path.is_absolute():
-        venv_path = Path(ls.workspace.root_path) / venv_path
-    ls.show_message("Validating Did change configuration...{}".format(venv_path))
-    ls.project = Project(
-        ls.workspace.root_path,
-        environment_path=venv_path if venv_path.exists() else None,
-    )
-    ls.extra_subsymbols = params.settings.get("extraSubsymbols", {})
-    ls.extra_subsymbols = _dotted_dict_to_normal(ls.extra_subsymbols)
-    ls.extra_subsymbols = tuple(
-        (k, v) for k, v in ls.extra_subsymbols.items() if v is not None
-    )
-    ls.show_message(f"Extra subsymbols: {ls.extra_subsymbols}")
+    ls._configuration_settings = ls.lsp._converter.structure(params.settings, Settings)
+    # ls.project = Project.from_settings(
+    #     ls.configuration_settings.project, Path(ls.workspace.root_path)
+    # )
 
 
 @functools.lru_cache(maxsize=512)
@@ -396,7 +395,7 @@ def function(
     document = server.workspace.get_document(doc_uri)
     s = server.project.get_script(document=document)
     if generate_importables:
-        imp = get_modules(server.project, server.extra_subsymbols)
+        imp = get_modules(server.project, tuple())
         server.send_voice("enhance_spoken", "importable", imp)
     else:
         imp = None
