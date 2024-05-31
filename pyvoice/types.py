@@ -1,6 +1,6 @@
 import enum
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, NewType, Optional, Tuple
 
 import attrs
 
@@ -18,12 +18,15 @@ class ModuleItem:
     kind: SpokenKind = attrs.field(default=SpokenKind.IMPORTABLE)
 
 
-@attrs.frozen
+RelativePath = NewType("RelativePath", Path)
+
+
+@attrs.define
 class ProjectSettings:
-    path: Path = attrs.field(default=Path("."))
-    environment_path: Path = attrs.field(default=Path(".venv"))
-    sys_path: Optional[Tuple[Path]] = attrs.field(default=None)
-    added_sys_path: Tuple[Path] = attrs.field(default=tuple())
+    path: RelativePath = attrs.field(default=RelativePath("."))
+    environment_path: RelativePath = attrs.field(default=RelativePath(".venv"))
+    sys_path: Optional[Tuple[RelativePath, ...]] = attrs.field(default=None)
+    added_sys_path: Tuple[RelativePath, ...] = attrs.field(default=tuple())
     smart_sys_path: bool = attrs.field(default=True)
 
 

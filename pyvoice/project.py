@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 import jedi
+from cachetools import LRUCache, cached
 
 from pyvoice.types import ProjectSettings
 
@@ -22,26 +23,11 @@ class Project(jedi.Project):
         return s
 
     @staticmethod
-    def from_settings(settings: ProjectSettings, base_path: Path):
-        def get_path(path, key):
-            if path.is_absolute() and path.exists():
-                return path
-            elif (base_path / path).exists():
-                return (base_path / path).absolute()
-            else:
-                logger.error("Path %s for %s does not exist", path, key)
-                return None
-
+    def from_settings(settings: ProjectSettings):
         return Project(
-            path=get_path(settings.path, "path"),
-            environment_path=(get_path(settings.environment_path, "environment_path")),
-            added_sys_path=(
-                tuple(get_path(p, "added_sys_path") for p in settings.added_sys_path)
-            ),
-            sys_path=(
-                tuple(get_path(p, "sys_path") for p in settings.sys_path)
-                if settings.sys_path is not None
-                else None
-            ),
+            path=settings.path,
+            environment_path=settings.environment_path,
+            added_sys_path=settings.added_sys_path,
+            sys_path=settings.sys_path,
             smart_sys_path=settings.smart_sys_path,
         )
