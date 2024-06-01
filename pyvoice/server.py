@@ -101,7 +101,10 @@ class PyVoiceLanguageServer(LanguageServer):
                     server.lsp._converter.structure(value, arg_type.annotation)
                     for arg_type, value in zip(f_args, args)
                 ]
-                return f(server, *new_args)
+                try:
+                    return f(server, *new_args)
+                except jedi.api.environment.InvalidPythonEnvironment as e:
+                    logger.error(e, stack_info=False)
 
             self.lsp.fm.command(command_name)(function)
             return f
