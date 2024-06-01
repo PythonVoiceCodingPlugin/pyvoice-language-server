@@ -111,17 +111,11 @@ class PyVoiceLanguageServer(LanguageServer):
     @property
     def project(self) -> Project:
         try:
-            if (
-                self._last_workspace_root_path == self.workspace.root_path
-                or self._last_configuration_settings == self.configuration_settings
-            ):
-                return self._project
+            return self._project
         except AttributeError:
-            logger.info(
-                "Creating jedi project from %s", self.configuration_settings.project
+            logger.debug(
+                "Creating new jedi project from %s", self.configuration_settings.project
             )
-            self._last_workspace_root_path = self.workspace.root_path
-            self._last_configuration_settings = self.configuration_settings
             self._project = Project.from_settings(self.configuration_settings.project)
             return self._project
 
@@ -155,9 +149,20 @@ def workspace_did_change_configuration(
     ls: PyVoiceLanguageServer, params: DidChangeConfigurationParams
 ):
     ls._configuration_settings = ls.lsp._converter.structure(params.settings, Settings)
-    # ls.project = Project.from_settings(
-    #     ls.configuration_settings.project, Path(ls.workspace.root_path)
-    # )
+    try:
+        del ls._project
+    except AttributeError:
+        pass
+
+    try:
+        env = ls.project.get_environment()
+        logger.info(
+            "Successfully created jedi project at %s with python %s",
+            ls.project.path,
+            repr(env).split(":", maxsplit=1)[1][:-1],
+        )
+    except jedi.api.environment.InvalidPythonEnvironment as e:
+        logger.error(e, stack_info=False)
 
 
 @functools.lru_cache(maxsize=512)

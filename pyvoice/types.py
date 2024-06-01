@@ -1,6 +1,6 @@
 import enum
 from pathlib import Path
-from typing import List, NewType, Optional, Tuple
+from typing import NewType, Optional, Tuple
 
 import attrs
 
@@ -24,7 +24,7 @@ RelativePath = NewType("RelativePath", Path)
 @attrs.define
 class ProjectSettings:
     path: RelativePath = attrs.field(default=RelativePath("."))
-    environment_path: RelativePath = attrs.field(default=RelativePath(".venv"))
+    environment_path: Optional[RelativePath] = attrs.field(default=None)
     sys_path: Optional[Tuple[RelativePath, ...]] = attrs.field(default=None)
     added_sys_path: Tuple[RelativePath, ...] = attrs.field(default=tuple())
     smart_sys_path: bool = attrs.field(default=True)

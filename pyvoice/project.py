@@ -1,8 +1,6 @@
 import logging
-from pathlib import Path
 
 import jedi
-from cachetools import LRUCache, cached
 
 from pyvoice.types import ProjectSettings
 
