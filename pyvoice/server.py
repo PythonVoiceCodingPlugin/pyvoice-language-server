@@ -1,9 +1,6 @@
-import functools
-import itertools
 import logging
 import sys  # noqa
 from itertools import groupby
-from pathlib import Path
 from typing import (  # noqa
     Any,
     Callable,
@@ -17,9 +14,6 @@ from typing import (  # noqa
 )
 
 import jedi
-import toml
-from cachetools import LRUCache, cached
-from importlib_metadata import Distribution
 from lsprotocol.types import (
     WORKSPACE_DID_CHANGE_CONFIGURATION,
     DidChangeConfigurationParams,
@@ -29,11 +23,9 @@ from lsprotocol.types import (
 from parso import parse
 from pygls import protocol
 from pygls.server import LanguageServer
-from requirements_detector import find_requirements
-from requirements_detector.exceptions import RequirementsNotFound
-from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.custom_jedi_classes import Project
+from pyvoice.generate_imports import get_modules
 from pyvoice.inference import (
     generate_nested,
     get_keyword_names,
@@ -144,239 +136,6 @@ def workspace_did_change_configuration(
         )
     except jedi.api.environment.InvalidPythonEnvironment as e:
         logger.error(e, stack_info=False)
-
-
-<<<<<<< HEAD
-@functools.lru_cache(maxsize=512)
-def with_prefix(prefix: str, name: jedi.api.classes.Name):
-    if prefix:
-        prefix = prefix + "."
-    n = name.name
-    if name.type == "function":
-        n = n + "()"
-    return f"{prefix}{n}"
-
-
-default_levels = {"module": 1, "instance": 2, "variable": 2, "param": 2, "statement": 2}
-
-
-@functools.lru_cache(maxsize=128)
-def instance_attributes(
-    full_name: str, project: Project
-) -> Sequence[jedi.api.classes.BaseName]:
-    if full_name is None:
-        return []
-    text = f"""
-import {full_name.split('.')[0]}
-_ : {full_name}
-_."""
-    small_script = project.get_script(code=text)
-    return [
-        x
-        for x in small_script.complete()
-        if "__" not in x.name and "leave" not in x.name and "visit" not in x.name
-    ]
-
-
-@cached(
-    cache=LRUCache(maxsize=512 * 4),
-    key=lambda name, prefix, level, project: (
-        name.full_name,
-        prefix,
-        level,
-        project.path,
-    ),
-)
-def generate_nested(
-    name: jedi.api.classes.Name,
-    prefix: str,
-    level: Optional[int] = None,
-    project: Optional[Project] = None,
-):
-    return list(_generate_nested(name, prefix, level, project))
-
-
-def _generate_nested(
-    name: jedi.api.classes.Name,
-    prefix: str,
-    level: Optional[int] = None,
-    project: Optional[Project] = None,
-):
-    if level is None:
-        level = default_levels.get(name.type, 1)
-    if level <= 0:
-        return
-    if name.type == "module":
-        if name.name == "pytest":
-            level += 1
-        for n in module_public_names(project, name.full_name):
-            yield with_prefix(prefix, n)
-            yield from _generate_nested(n, prefix, level - 1)
-    elif name.type == "instance":
-        for n in instance_attributes(name.full_name, project):
-            yield with_prefix(prefix, n)
-            if (
-                n.type in ["instance", "variable", "statement", "param"]
-                and not name.name.startswith("_")
-                and not n.name.startswith("_")
-                and True
-            ):
-                yield from _generate_nested(n, f"{prefix}.{n.name}", level - 1, project)
-    elif name.type in ["variable", "statement", "param"]:
-        for n in name.infer():
-            yield from _generate_nested(n, prefix, level, project)
-    elif name.type == "function":
-        return
-        # if "def " in name.get_line_code():
-        #     for n in name.defined_names():
-        #         yield with_prefix(prefix, n)
-        #         yield from generate_nested(n, n.name, None, project)
-    elif name.type == "class" and name.name.endswith("Targets"):
-        #        return
-        for n in name.defined_names():
-            yield with_prefix(prefix, n)
-        #     yield from generate_nested(n, prefix, level - 1)
-
-
-@cached(cache=LRUCache(maxsize=512 * 4), key=lambda n: n.full_name)
-def get_keyword_names(n: jedi.api.classes.Name):
-    output = []
-    for signature in n.get_signatures():
-        output.extend(p.name for p in signature.params)
-    return output
-
-
-@functools.lru_cache()
-def ignored_names(project: Project):
-    return {x.full_name for x in jedi.Script("", project=project).complete()}
-
-
-@functools.lru_cache(maxsize=128)
-def module_public_names(
-    project: Project, module_name: str
-) -> Sequence[jedi.api.classes.BaseName]:
-    ignore = ignored_names(project)
-    small_script = project.get_script(
-        code=f"from {module_name} import *\n",
-    )
-
-    return [
-        name
-        for name in small_script.complete()
-        if name.full_name not in ignore and name.full_name
-    ]
-
-
-def get_top_level_dependencies_names(project: Project) -> Sequence[str]:
-    try:
-        p = project.path / "pyproject.toml"
-        data = toml.loads(p.read_text())
-        return (
-            data.get("project", {}).get("dependencies", [])
-            or data["tool"]["poetry"]["dependencies"].keys()
-        )
-    except Exception:
-        try:
-            return [x.name for x in find_requirements(project.path)]
-        except RequirementsNotFound:
-            return []
-
-
-@functools.lru_cache()
-def get_modules_from_distribution(project: Project, name: str) -> Sequence[ModuleItem]:
-    try:
-        return [
-            relative_path_to_item(f)
-            for distribution in Distribution.discover(
-                name=name, path=project.get_environment().get_sys_path()
-            )
-            for f in distribution.files
-            if f.suffix == ".py"
-        ]
-
-    except Exception:
-        if name != "python":
-            raise ValueError(name) from None
-        return []
-
-
-def get_top_level_dependencies_modules(project: Project):
-    return [
-        x
-        for dependency_name in get_top_level_dependencies_names(project)
-        for x in get_modules_from_distribution(project, dependency_name)
-    ]
-
-
-@functools.lru_cache()
-def relative_path_to_item(x: Path) -> ModuleItem:
-    if x.name == "__init__.py":
-        return relative_path_to_item(x.parent)
-    if len(x.parts) == 1:
-        return ModuleItem(
-            spoken=speak_single_item(" ".join(x.parts).replace(".py", "")),
-            module=x.name.replace(".py", ""),
-            name=None,
-        )
-    return ModuleItem(
-        spoken=speak_single_item(" ".join(x.parts).replace(".py", "")),
-        module=".".join(x.parts[:-1]).replace(".py", ""),
-        name=x.stem,
-    )
-
-
-@functools.lru_cache()
-def get_stdlib_modules(project: Project):
-    return [
-        ModuleItem(spoken=speak_single_item(x), module=x, name=None)
-        for x in stdlib_module_names
-        if not x.startswith("_")
-    ]
-
-
-@functools.lru_cache()
-def get_extra_subsymbols(project: Project, key_value_pairs: Sequence[Tuple[str, str]]):
-    output = [
-        ModuleItem(
-            spoken=speak_single_item(f"{spoken_prefix} {name.name}"),
-            module=module_name,
-            name=name.name,
-        )
-        for module_name, spoken_prefix in key_value_pairs
-        for name in module_public_names(project, module_name)
-    ]
-    return output
-
-
-@cached(
-    cache=LRUCache(maxsize=4),
-    key=lambda project: (project, project.path.stat().st_mtime),
-)
-def get_project_modules(project: Project):
-    output = [
-        relative_path_to_item(x)
-        for y in project.path.iterdir()
-        if not y.name.startswith(".") and y.is_dir()
-        for x in map(
-            lambda p: p.relative_to(project.path),
-            Path(y).glob("**/*.py"),
-        )
-        if len(x.parts) > 1 and "." not in x.parts[0]
-    ]
-    return output
-
-
-def get_modules(
-    project: Project, extra_subsymbols: Sequence[Tuple[str, str]]
-) -> List[ModuleItem]:
-    return list(
-        itertools.chain(
-            get_stdlib_modules(project),
-            get_top_level_dependencies_modules(project),
-            get_project_modules(project),
-            get_extra_subsymbols(project, extra_subsymbols),
-        )
-    )
 
 
 @server.command("get_spoken")
