@@ -28,7 +28,6 @@ from lsprotocol.types import (
 )
 from parso import parse
 from pygls import protocol
-from pygls.protocol import LanguageServerProtocol
 from pygls.server import LanguageServer
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
@@ -45,20 +44,6 @@ F = TypeVar("F", bound=Callable)
 
 
 logger = logging.getLogger(__name__)
-
-
-class MyProtocol(LanguageServerProtocol):
-    # @lsp_method(INITIALIZE)
-    # def lsp_initialize(self, params: InitializeParams) -> InitializeResult:
-    #     x = super().lsp_initialize(params)
-    #     venv_path = Path(self._server.workspace.root_path) / ".venv"
-    #     self._server.project = Project(
-    #         self._server.workspace.root_path,
-    #         environment_path=venv_path if venv_path.exists() else None,
-    #     )
-    #     # self._server.extra_subsymbols = {}
-    #     return x
-    pass
 
 
 class PyVoiceLanguageServer(LanguageServer):
@@ -117,9 +102,7 @@ class PyVoiceLanguageServer(LanguageServer):
         )
 
 
-server = PyVoiceLanguageServer(
-    name="pyvoice", version="0.0.0a2", protocol_cls=MyProtocol
-)
+server = PyVoiceLanguageServer(name="pyvoice", version="0.0.0a2")
 
 
 def _dotted_dict_to_normal(d: dict, prefix=""):
