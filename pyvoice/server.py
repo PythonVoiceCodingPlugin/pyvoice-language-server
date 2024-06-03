@@ -28,7 +28,7 @@ from lsprotocol.types import (
 )
 from parso import parse
 from pygls import protocol
-from pygls.protocol import LanguageServerProtocol, default_converter
+from pygls.protocol import LanguageServerProtocol
 from pygls.server import LanguageServer
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
@@ -36,7 +36,7 @@ from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.custom_jedi_classes import Project
 from pyvoice.speakify import speak_items, speak_single_item
-from pyvoice.types import ModuleItem, RelativePath, Settings
+from pyvoice.types import ModuleItem, Settings, register_custom_hooks
 
 from .text_edit_utils import lsp_text_edits
 
@@ -63,23 +63,8 @@ class MyProtocol(LanguageServerProtocol):
 
 class PyVoiceLanguageServer(LanguageServer):
     def __init__(self, *args, **kwargs):
-        converter_factory = kwargs.pop("converter_factory", default_converter)
-
-        def wrapper_factory():
-            converter = converter_factory()
-
-            def hook(value, _):
-                base_path = Path(self.workspace.root_path)
-                p = converter.structure(value, Path)
-                if p.is_absolute():
-                    return p
-                return (base_path / p).absolute()
-
-            converter.register_structure_hook(RelativePath, hook)
-            return converter
-
-        kwargs["converter_factory"] = wrapper_factory
         super().__init__(*args, **kwargs)
+        register_custom_hooks(self)
 
     def command(
         self, command_name: str
