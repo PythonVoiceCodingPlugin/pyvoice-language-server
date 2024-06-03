@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyvoice"
-version = "0.0.0.a4"
+version = "0.0.0b1"
 description = "pyvoice"
 authors = ["mpourmpoulis <35875229+mpourmpoulis@users.noreply.github.com>"]
 license = "GPL-3.0"

@@ -102,7 +102,7 @@ class PyVoiceLanguageServer(LanguageServer):
         )
 
 
-server = PyVoiceLanguageServer(name="pyvoice", version="0.0.0a2")
+server = PyVoiceLanguageServer(name="pyvoice", version="0.0.0b1")
 
 
 def _dotted_dict_to_normal(d: dict, prefix=""):
