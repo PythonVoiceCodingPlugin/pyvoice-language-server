@@ -34,6 +34,16 @@ from requirements_detector.exceptions import RequirementsNotFound
 from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.custom_jedi_classes import Project
+from pyvoice.inference import (
+    generate_nested,
+    get_keyword_names,
+    get_scopes,
+    join_names,
+    module_public_names,
+    module_public_names_fuzzy,
+    pretty_scope_list,
+    with_prefix,
+)
 from pyvoice.speakify import speak_items, speak_single_item
 from pyvoice.types import ModuleItem, Settings, register_custom_hooks
 
@@ -136,6 +146,7 @@ def workspace_did_change_configuration(
         logger.error(e, stack_info=False)
 
 
+<<<<<<< HEAD
 @functools.lru_cache(maxsize=512)
 def with_prefix(prefix: str, name: jedi.api.classes.Name):
     if prefix:
@@ -248,7 +259,6 @@ def module_public_names(
     small_script = project.get_script(
         code=f"from {module_name} import *\n",
     )
->>>>>>> 568b51b... create dedicated custom project class
 
     return [
         name
@@ -369,20 +379,6 @@ def get_modules(
     )
 
 
-def get_scopes(script: jedi.Script, pos: Position):
-    scope = script.get_context(pos.line + 1, None)
-    while scope:
-        yield scope
-        scope = scope.parent()
-
-
-def pretty_scope_list(containing_scopes):
-    return " > ".join(
-        x.description if x.type != "module" else "mod " + x.full_name
-        for x in reversed(containing_scopes)
-    )
-
-
 @server.command("get_spoken")
 def function(
     server: PyVoiceLanguageServer,
@@ -488,13 +484,6 @@ def function_add_import(
     server.apply_edit(edit)
 
 
-def join_names(a: str, b: str) -> str:
-    if a and b:
-        return f"{a}.{b}"
-    else:
-        return f"{a or b}"
-
-
 @server.command("from_import")
 def function_from_import(server: PyVoiceLanguageServer, item: ModuleItem):
     module_name = join_names(item.module, item.name)
@@ -503,21 +492,6 @@ def function_from_import(server: PyVoiceLanguageServer, item: ModuleItem):
         for x in module_public_names(server.project, module_name)
     ]
     server.send_voice("enhance_spoken", "subsymbol", s)
-
-
-def module_public_names_fuzzy(
-    project: Project, current_path: str, module_name: str, name: str
-) -> Sequence[jedi.api.classes.BaseName]:
-    ignore = ignored_names(project)
-    return [
-        name
-        for name in jedi.Script(
-            f"from {module_name} import *\n{name.replace(' ','')}",
-            project=project,
-            path=current_path,
-        ).complete(fuzzy=True)
-        if name.full_name not in ignore and name.full_name
-    ]
 
 
 @server.command("from_import_fuzzy")
