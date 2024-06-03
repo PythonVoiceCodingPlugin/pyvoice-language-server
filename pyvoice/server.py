@@ -34,7 +34,7 @@ from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
 from stdlibs import module_names as stdlib_module_names
 
-from pyvoice.project import Project
+from pyvoice.custom_jedi_classes import Project
 from pyvoice.speakify import speak_items, speak_single_item
 from pyvoice.types import ModuleItem, RelativePath, Settings
 
