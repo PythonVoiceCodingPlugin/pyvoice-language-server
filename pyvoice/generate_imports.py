@@ -1,19 +1,27 @@
 import functools
 import itertools
 from pathlib import Path
-from typing import List, Sequence, Tuple
+from typing import List, Optional, Sequence
 
 import toml
 from cachetools import LRUCache, cached
 from importlib_metadata import Distribution
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
+from requirements_detector.requirement import DetectedRequirement
 from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.custom_jedi_classes import Project
 from pyvoice.inference import module_public_names
 from pyvoice.speakify import speak_single_item
-from pyvoice.types import ModuleItem
+from pyvoice.types import (
+    ImportSettings,
+    ModuleItem,
+    ProjectImportsSettings,
+    StdlibImportsSettings,
+    SymbolsImportsSettings,
+    ThirdPartyImportsSettings,
+)
 
 __all__ = [
     "get_modules",
@@ -27,19 +35,65 @@ __all__ = [
 ]
 
 
-def get_top_level_dependencies_names(project: Project) -> Sequence[str]:
+@cached(
+    cache=LRUCache(maxsize=4),
+    key=lambda project: (project.path, project.path.stat().st_mtime),
+)
+def _get_pyproject_toml(project: Project) -> Optional[dict]:
     try:
         p = project.path / "pyproject.toml"
-        data = toml.loads(p.read_text())
-        return (
-            data.get("project", {}).get("dependencies", [])
-            or data["tool"]["poetry"]["dependencies"].keys()
-        )
+        return toml.loads(p.read_text())
     except Exception:
+        return None
+
+
+# def _get_dependencies_from_pyproject_toml(project: Project) -> Sequence[str]:
+def _get_pep621_dependencies(project: Project) -> Sequence[str]:
+    pyproject_toml = _get_pyproject_toml(project)
+    if pyproject_toml is None:
+        raise RequirementsNotFound("pyproject.toml not found")
+    try:
+        raw = list(pyproject_toml["project"]["dependencies"].keys())
+        parsed = [DetectedRequirement.parse(x) for x in raw]
+        return [
+            x.name
+            for x in parsed
+            if x is not None and x.name is not None and x.name != "python"
+        ]
+
+    except (KeyError, AttributeError) as e:
+        raise RequirementsNotFound(
+            "No pep621 dependencies found in pyproject.toml"
+        ) from e
+
+
+def _get_poetry_dependencies(project: Project) -> Sequence[str]:
+    pyproject_toml = _get_pyproject_toml(project)
+    if pyproject_toml is None:
+        raise RequirementsNotFound("pyproject.toml not found")
+    try:
+        return list(pyproject_toml["tool"]["poetry"]["dependencies"].keys())
+    except (KeyError, AttributeError) as e:
+        raise RequirementsNotFound(
+            "No poetry dependencies found in pyproject.toml"
+        ) from e
+
+
+def _get_traditional_dependencies(project: Project) -> Sequence[str]:
+    return [x.name for x in find_requirements(project.path)]
+
+
+def get_top_level_dependencies_names(project: Project) -> Sequence[str]:
+    for method in (
+        _get_pep621_dependencies,
+        _get_poetry_dependencies,
+        _get_traditional_dependencies,
+    ):
         try:
-            return [x.name for x in find_requirements(project.path)]
+            return method(project)
         except RequirementsNotFound:
-            return []
+            pass
+    return []
 
 
 @functools.lru_cache()
@@ -60,10 +114,18 @@ def get_modules_from_distribution(project: Project, name: str) -> Sequence[Modul
         return []
 
 
-def get_top_level_dependencies_modules(project: Project):
+@cached(cache=LRUCache(maxsize=4))
+def get_top_level_dependencies_modules(
+    project: Project, settings: ThirdPartyImportsSettings
+):
+    if not settings.enabled:
+        return []
+    detected = get_top_level_dependencies_names(project)
+    detected.extend(settings.include_dists)
+    names = filter(lambda x: x not in settings.exclude_dists, set(detected))
     return [
         x
-        for dependency_name in get_top_level_dependencies_names(project)
+        for dependency_name in names
         for x in get_modules_from_distribution(project, dependency_name)
     ]
 
@@ -85,8 +147,12 @@ def relative_path_to_item(x: Path) -> ModuleItem:
     )
 
 
-@functools.lru_cache()
-def get_stdlib_modules(project: Project):
+@cached(cache=LRUCache(maxsize=4))
+def get_stdlib_modules(
+    project: Project, settings: StdlibImportsSettings
+) -> List[ModuleItem]:
+    if not settings.enabled:
+        return []
     return [
         ModuleItem(spoken=speak_single_item(x), module=x, name=None)
         for x in stdlib_module_names
@@ -94,15 +160,19 @@ def get_stdlib_modules(project: Project):
     ]
 
 
-@functools.lru_cache()
-def get_extra_subsymbols(project: Project, key_value_pairs: Sequence[Tuple[str, str]]):
+@cached(
+    cache=LRUCache(maxsize=4),
+)
+def get_extra_subsymbols(project: Project, settings: SymbolsImportsSettings):
+    if not settings.enabled:
+        return []
     output = [
         ModuleItem(
-            spoken=speak_single_item(f"{spoken_prefix} {name.name}"),
+            spoken=speak_single_item(f"{name.name}"),
             module=module_name,
             name=name.name,
         )
-        for module_name, spoken_prefix in key_value_pairs
+        for module_name in settings.modules
         for name in module_public_names(project, module_name)
     ]
     return output
@@ -110,9 +180,11 @@ def get_extra_subsymbols(project: Project, key_value_pairs: Sequence[Tuple[str, 
 
 @cached(
     cache=LRUCache(maxsize=4),
-    key=lambda project: (project, project.path.stat().st_mtime),
+    key=lambda project, settings: (project, project.path.stat().st_mtime, settings),
 )
-def get_project_modules(project: Project):
+def get_project_modules(project: Project, settings: ProjectImportsSettings):
+    if not settings.enabled:
+        return []
     output = [
         relative_path_to_item(x)
         for y in project.path.iterdir()
@@ -127,13 +199,14 @@ def get_project_modules(project: Project):
 
 
 def get_modules(
-    project: Project, extra_subsymbols: Sequence[Tuple[str, str]]
+    project: Project,
+    settings: ImportSettings,
 ) -> List[ModuleItem]:
     return list(
         itertools.chain(
-            get_stdlib_modules(project),
-            get_top_level_dependencies_modules(project),
-            get_project_modules(project),
-            get_extra_subsymbols(project, extra_subsymbols),
+            get_stdlib_modules(project, settings.stdlib),
+            get_top_level_dependencies_modules(project, settings.third_party),
+            get_project_modules(project, settings.project),
+            get_extra_subsymbols(project, settings.explicit_symbols),
         )
     )

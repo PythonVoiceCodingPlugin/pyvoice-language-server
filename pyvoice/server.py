@@ -17,7 +17,10 @@ import jedi
 from lsprotocol.types import (
     WORKSPACE_DID_CHANGE_CONFIGURATION,
     DidChangeConfigurationParams,
+    MessageActionItem,
+    MessageType,
     Position,
+    ShowMessageRequestParams,
     WorkspaceEdit,
 )
 from parso import parse
@@ -77,6 +80,9 @@ class PyVoiceLanguageServer(LanguageServer):
                     return f(server, *new_args)
                 except jedi.api.environment.InvalidPythonEnvironment as e:
                     logger.error(e, stack_info=False)
+                    # self.show_message_request(
+                    #     str(e), "hello" * 10, "world" * 10, callback=None
+                    # )
 
             self.lsp.fm.command(command_name)(function)
             return f
@@ -101,6 +107,16 @@ class PyVoiceLanguageServer(LanguageServer):
     def send_voice(self, command: str, *args, **kwargs):
         server.send_notification(
             "voice/sendRpc", {"command": command, "params": args or kwargs}
+        )
+
+    def show_message_request(self, message: str, *actions, callback):
+        return self.lsp.send_request(
+            "window/showMessageRequest",
+            ShowMessageRequestParams(
+                message=message,
+                type=MessageType.Info,
+                actions=[MessageActionItem(title=action) for action in actions],
+            ),
         )
 
 
@@ -148,7 +164,7 @@ def function(
     document = server.workspace.get_document(doc_uri)
     s = server.project.get_script(document=document)
     if generate_importables:
-        imp = get_modules(server.project, tuple())
+        imp = get_modules(server.project, server.configuration_settings.spoken.imports)
         server.send_voice("enhance_spoken", "importable", imp)
     else:
         imp = None
