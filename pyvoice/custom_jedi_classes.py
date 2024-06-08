@@ -1,6 +1,7 @@
 import logging
 
 import jedi
+from jedi.api.environment import create_environment, get_cached_default_environment
 
 from pyvoice.types import ProjectSettings
 
@@ -11,6 +12,20 @@ class Project(jedi.Project):
     def __init__(self, *args, **kwargs):
         super(Project, self).__init__(*args, **kwargs)
         self._inference_state = jedi.inference.InferenceState(self)
+
+    # monkey patching jedi.Project.get_environment
+    # use safe=True to enforce safety checks
+    # avoid execution of the environment python executable
+    # if it is not deemed trusted
+    def get_environment(self):
+        if self._environment is None:
+            if self._environment_path is not None:
+                self._environment = create_environment(
+                    self._environment_path, safe=True
+                )
+            else:
+                self._environment = get_cached_default_environment()
+        return self._environment
 
     def get_script(self, *, code=None, path=None, document=None):
         if document:
