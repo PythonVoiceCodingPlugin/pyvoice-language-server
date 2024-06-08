@@ -1,6 +1,5 @@
 import logging
 import sys  # noqa
-from itertools import groupby
 from typing import (  # noqa
     Any,
     Callable,
@@ -23,7 +22,6 @@ from lsprotocol.types import (
     ShowMessageRequestParams,
     WorkspaceEdit,
 )
-from parso import parse
 from pygls import protocol
 from pygls.server import LanguageServer
 
@@ -40,6 +38,7 @@ from pyvoice.inference import (
     with_prefix,
 )
 from pyvoice.speakify import speak_items, speak_single_item
+from pyvoice.transformations import add_imports_to_code
 from pyvoice.types import ModuleItem, Settings, register_custom_hooks
 
 from .text_edit_utils import lsp_text_edits
@@ -208,41 +207,6 @@ def function(
     else:
         logger.info(f"{len(output)} expressions {scope_message}")
         # server.show_message(f"{len(output)} expressions, skipped imports")
-
-
-# op server.send_voice( )
-def add_imports_to_module(module, items: list[ModuleItem]) -> None:
-    """add import statements to a module"""
-    new_nodes = []
-    for module_name, values in groupby(items, lambda x: x.module):
-        values = list(values)
-        names = [
-            x.name if not x.asname else f"{x.name} as {x.asname}"
-            for x in values
-            if x.name
-        ]
-        if names:
-            new_nodes.append(
-                parse(f"from {module_name} import {', '.join(names)}\n").children[0]
-            )
-        if any(x.name is None for x in values):
-            new_nodes.append(parse(f"import {module_name}\n").children[0])
-    start = 0
-    try:
-        if module.children[0].children[0].type == "string":
-            start = 1
-    except (IndexError, AttributeError):
-        pass
-    for node in new_nodes:
-        node.parent = module
-        module.children.insert(start, node)
-
-
-def add_imports_to_code(code: str, items: list[ModuleItem]) -> str:
-    """add import statements to a code string"""
-    module = parse(code)
-    add_imports_to_module(module, items)
-    return module.get_code()
 
 
 @server.command("add_import")
