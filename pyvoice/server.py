@@ -26,16 +26,15 @@ from pygls import protocol
 from pygls.server import LanguageServer
 
 from pyvoice.custom_jedi_classes import Project
+from pyvoice.generate_expressions import generate_nested, with_prefix
 from pyvoice.generate_imports import get_modules
 from pyvoice.inference import (
-    generate_nested,
     get_keyword_names,
     get_scopes,
     join_names,
     module_public_names,
     module_public_names_fuzzy,
     pretty_scope_list,
-    with_prefix,
 )
 from pyvoice.speakify import speak_items, speak_single_item
 from pyvoice.transformations import add_imports_to_code
