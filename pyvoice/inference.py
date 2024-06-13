@@ -1,5 +1,5 @@
 import functools
-from typing import Optional, Sequence
+from typing import Optional, Sequence, Set
 
 import jedi
 from cachetools import LRUCache, cached
@@ -125,20 +125,33 @@ def ignored_names(project: Project):
     return {x.full_name for x in jedi.Script("", project=project).complete()}
 
 
+def _get_module__all__(names: Sequence[jedi.api.classes.Name]) -> Set[str]:
+    try:
+        all_name = next(x for x in names if x.name == "__all__")
+        return set(
+            x.data._get_payload()
+            for literal_sequence in all_name.infer()
+            for x in literal_sequence._name._value.py__iter__()
+        )
+    except (AttributeError, StopIteration):
+        return {}
+
+
 @functools.lru_cache(maxsize=128)
 def module_public_names(
-    project: Project, module_name: str
+    project: Project,
+    module_name: str,
 ) -> Sequence[jedi.api.classes.BaseName]:
-    ignore = ignored_names(project)
     small_script = project.get_script(
-        code=f"from {module_name} import *\n",
+        code=f"from {module_name} import \n",
     )
+    completions = small_script.complete()
 
-    return [
-        name
-        for name in small_script.complete()
-        if name.full_name not in ignore and name.full_name
-    ]
+    module__all__ = _get_module__all__(completions)
+    if module__all__ is not None:
+        return [name for name in completions if name.name in module__all__]
+    else:
+        return [name for name in completions if not name.name.startswith("_")]
 
 
 def module_public_names_fuzzy(
