@@ -113,11 +113,8 @@ def _generate_nested(
 
 
 @cached(cache=LRUCache(maxsize=512 * 4), key=lambda n: n.full_name)
-def get_keyword_names(n: jedi.api.classes.Name):
-    output = []
-    for signature in n.get_signatures():
-        output.extend(p.name for p in signature.params)
-    return output
+def get_keyword_names(n: jedi.api.classes.BaseName) -> Sequence[str]:
+    return {p.name for signature in n.get_signatures() for p in signature.params}
 
 
 @functools.lru_cache()
