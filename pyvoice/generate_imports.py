@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import List, Optional, Sequence
 
 import toml
-from cachetools import LRUCache, cached
+from cachetools import LRUCache, TTLCache, cached
 from importlib_metadata import Distribution
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
@@ -183,14 +183,7 @@ def get_extra_subsymbols(project: Project, settings: SymbolsImportsSettings):
     return output
 
 
-@cached(
-    cache=LRUCache(maxsize=4),
-    key=lambda project, settings: (
-        project,
-        project.path.stat().st_mtime,
-        settings,
-    ),
-)
+@cached(cache=TTLCache(maxsize=4, ttl=60))
 def get_project_modules(project: Project, settings: ProjectImportsSettings):
     if not settings.enabled:
         return []
