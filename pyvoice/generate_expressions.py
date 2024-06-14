@@ -75,12 +75,7 @@ def _generate_nested(
             yield from _generate_nested(n, prefix, level, project)
     elif name.type == "function":
         return
-        # if "def " in name.get_line_code():
-        #     for n in name.defined_names():
-        #         yield with_prefix(prefix, n)
-        #         yield from generate_nested(n, n.name, None, project)
-    elif name.type == "class" and name.name.endswith("Targets"):
-        #        return
+    elif name.type == "class" and hasattr(name, "defined_names"):
         for n in name.defined_names():
-            yield with_prefix(prefix, n)
-        #     yield from generate_nested(n, prefix, level - 1)
+            if n.type == "statement":
+                yield with_prefix(prefix, n)
