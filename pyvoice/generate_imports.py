@@ -9,6 +9,11 @@ from importlib_metadata import Distribution
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
 from requirements_detector.requirement import DetectedRequirement
+from setuptools.discovery import (
+    FlatLayoutModuleFinder,
+    FlatLayoutPackageFinder,
+    find_package_path,
+)
 from stdlibs import module_names as stdlib_module_names
 
 from pyvoice.custom_jedi_classes import Project
@@ -180,21 +185,43 @@ def get_extra_subsymbols(project: Project, settings: SymbolsImportsSettings):
 
 @cached(
     cache=LRUCache(maxsize=4),
-    key=lambda project, settings: (project, project.path.stat().st_mtime, settings),
+    key=lambda project, settings: (
+        project,
+        project.path.stat().st_mtime,
+        settings,
+    ),
 )
 def get_project_modules(project: Project, settings: ProjectImportsSettings):
     if not settings.enabled:
         return []
-    output = [
+
+    # try src layout first
+    src_path = project.path.joinpath("src")
+    if src_path.exists() and src_path.is_dir():
+        return [
+            relative_path_to_item(x)
+            for x in map(
+                lambda p: p.relative_to(src_path),
+                src_path.rglob("*.py"),
+            )
+        ]
+    # if that fails, we allow for a mixure of what setuptools
+    # calls flat layout package and flat layout module
+    output = []
+    top_modules: List[str] = FlatLayoutModuleFinder.find(project.path)
+    output.extend(
+        ModuleItem(spoken=speak_single_item(x), module=x, name=None)
+        for x in top_modules
+    )
+    packages: List[str] = FlatLayoutPackageFinder.find(project.path)
+    output.extend(
         relative_path_to_item(x)
-        for y in project.path.iterdir()
-        if not y.name.startswith(".") and y.is_dir()
+        for pkg in packages
         for x in map(
             lambda p: p.relative_to(project.path),
-            Path(y).glob("**/*.py"),
+            Path(find_package_path(pkg, {}, project.path)).glob("*.py"),
         )
-        if len(x.parts) > 1 and "." not in x.parts[0]
-    ]
+    )
     return output
 
 
