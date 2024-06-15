@@ -1,4 +1,5 @@
 import functools
+import logging
 from typing import Sequence, Set
 
 import jedi
@@ -7,6 +8,7 @@ from lsprotocol.types import Position
 
 from pyvoice.custom_jedi_classes import Project
 
+logger = logging.getLogger(__name__)
 __all__ = [
     "join_names",
     "instance_attributes",
@@ -99,7 +101,16 @@ def join_names(a: str, b: str) -> str:
 
 
 def get_scopes(script: jedi.Script, pos: Position):
-    scope = script.get_context(pos.line + 1, None)
+    try:
+        scope = script.get_context(pos.line + 1, None)
+    except ValueError:
+        # this is 100% a hack that should not be here
+        # but sometimes we are asked to generate spoken
+        # hints BEFORE  textdocument/didChange arrives
+        # 100% not where it should be solved but for now
+        # quick and dirty
+        logger.debug("Race condition in get_scopes vs textdocument/didChange")
+        scope = script.get_context(None, None)
     while scope:
         yield scope
         scope = scope.parent()
