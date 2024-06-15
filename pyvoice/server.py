@@ -26,7 +26,7 @@ from pygls import protocol
 from pygls.server import LanguageServer
 
 from pyvoice.custom_jedi_classes import Project
-from pyvoice.generate_expressions import generate_nested, with_prefix
+from pyvoice.generate_expressions import generate_nested, into_item, with_prefix
 from pyvoice.generate_imports import get_modules
 from pyvoice.inference import (
     get_keyword_names,
@@ -36,7 +36,7 @@ from pyvoice.inference import (
     module_public_names_fuzzy,
     pretty_scope_list,
 )
-from pyvoice.speakify import speak_items, speak_single_item
+from pyvoice.speakify import speak_single_item
 from pyvoice.transformations import add_imports_to_code
 from pyvoice.types import ModuleItem, Settings, register_custom_hooks
 
@@ -175,7 +175,7 @@ def function(
                 n, n.name if n.type != "function" else "", None, server.project
             )
         )
-        output.extend(get_keyword_names(n))
+        output.extend(into_item(k) for k in get_keyword_names(n))
     if pos:
         containing_scopes = list(get_scopes(s, pos))
         for scope in containing_scopes:
@@ -190,15 +190,10 @@ def function(
                             server.project,
                         )
                     )
-    output = [x for x in sorted(set(output)) if "__" not in x]
+    output = [x for x in set(output) if "__" not in x.value]
     if len(output) < 2000:
         output = output[:2000]
-    d = speak_items(output)
-    server.send_voice(
-        "enhance_spoken",
-        "expression",
-        [{"spoken": k, "value": v} for k, v in d.items()],
-    )
+    server.send_voice("enhance_spoken", "expression", output)
     scope_message = "inside " + pretty_scope_list(containing_scopes) if pos else ""
     if imp is not None:
         logger.info(f"{len(imp)} imports, {len(output)} expressions {scope_message}")

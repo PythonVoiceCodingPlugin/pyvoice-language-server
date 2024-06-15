@@ -6,21 +6,30 @@ from cachetools import LRUCache, cached
 
 from pyvoice.custom_jedi_classes import Project
 from pyvoice.inference import instance_attributes, module_public_names
+from pyvoice.speakify import speak_single_item
+from pyvoice.types import ExpressionItem
 
 __all__ = [
     "generate_nested",
+    "into_item",
     "with_prefix",
 ]
 
 
+@functools.lru_cache(maxsize=1024 * 8)
+def into_item(value: str) -> ExpressionItem:
+    spoken = speak_single_item(value)
+    return ExpressionItem(value=value, spoken=spoken)
+
+
 @functools.lru_cache(maxsize=512)
-def with_prefix(prefix: str, name: jedi.api.classes.BaseName) -> str:
+def with_prefix(prefix: str, name: jedi.api.classes.BaseName) -> ExpressionItem:
     if prefix:
         prefix = prefix + "."
     n = name.name
     if name.type == "function":
         n = n + "()"
-    return f"{prefix}{n}"
+    return into_item(f"{prefix}{n}")
 
 
 default_levels = {"module": 1, "instance": 2, "variable": 2, "param": 2, "statement": 2}

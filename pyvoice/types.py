@@ -9,6 +9,7 @@ from pygls.server import LanguageServer
 __all__ = [
     "SpokenKind",
     "ModuleItem",
+    "ExpressionItem",
     "RelativePath",
     "ProjectSettings",
     "Settings",
@@ -18,6 +19,12 @@ __all__ = [
 
 class SpokenKind(enum.Flag):
     IMPORTABLE = enum.auto()
+
+
+@attrs.frozen
+class ExpressionItem:
+    spoken: str
+    value: str
 
 
 @attrs.define
