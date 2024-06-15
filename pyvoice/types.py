@@ -121,13 +121,34 @@ class ImportSettings:
 
 
 # Settings for the various generators of spoken expressions
+
+
+@attrs.define
+class ScopeSettings:
+    # Enable or disable the generation of spoken hints for this scope
+    enabled: bool = attrs.field(default=True)
+
+    # Generate hints from the parameter names of the
+    # signatures of the symbols defined in this scope.
+    signature: bool = attrs.field(default=True)
+
+
 @attrs.define
 class ExpressionSettings:
-    # Enable or disable scope expressions.
-    scope: bool = attrs.field(default=True)
+    # settings for the local scope
+    locals: ScopeSettings = attrs.field(factory=ScopeSettings)
+    # settings for the non-local scope
+    nonlocals: ScopeSettings = attrs.field(factory=ScopeSettings)
+    # settings for the global scope
+    globals: ScopeSettings = attrs.field(factory=ScopeSettings)
+    # settings for the builtin scope
+    builtins: ScopeSettings = attrs.field(factory=ScopeSettings)
 
-    # Enable or disable keyword expressions.
-    keyword: bool = attrs.field(default=True)
+    # an upper bound on the number of expressions to generate
+    # this is needed to avoid generating too many expressions
+    # which can be overwhelming for the grammar compiler of
+    # the programming by voice system.
+    limit: int = attrs.field(default=2000)
 
 
 @attrs.define
