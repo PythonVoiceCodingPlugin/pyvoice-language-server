@@ -120,16 +120,6 @@ class PyVoiceLanguageServer(LanguageServer):
 server = PyVoiceLanguageServer(name="pyvoice", version="0.0.0b1")
 
 
-def _dotted_dict_to_normal(d: dict, prefix=""):
-    output = {}
-    for k, v in d.items():
-        if isinstance(v, dict):
-            output.update(_dotted_dict_to_normal(v, f"{prefix}{k}."))
-        else:
-            output[f"{prefix}{k}"] = v
-    return output
-
-
 @server.feature(WORKSPACE_DID_CHANGE_CONFIGURATION)
 def workspace_did_change_configuration(
     ls: PyVoiceLanguageServer, params: DidChangeConfigurationParams
