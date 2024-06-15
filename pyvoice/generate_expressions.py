@@ -128,6 +128,6 @@ def get_expressions(
                         )
                     )
     output = [x for x in set(output) if "__" not in x.value]
-    if len(output) < 2000:
+    if len(output) > 2000:
         output = output[:2000]
     return output
