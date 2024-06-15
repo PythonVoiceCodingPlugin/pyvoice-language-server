@@ -26,10 +26,9 @@ from pygls import protocol
 from pygls.server import LanguageServer
 
 from pyvoice.custom_jedi_classes import Project
-from pyvoice.generate_expressions import generate_nested, into_item, with_prefix
+from pyvoice.generate_expressions import get_expressions
 from pyvoice.generate_imports import get_modules
 from pyvoice.inference import (
-    get_keyword_names,
     get_scopes,
     join_names,
     module_public_names,
@@ -166,41 +165,21 @@ def function(
         server.send_voice("enhance_spoken", "importable", imp)
     else:
         imp = None
-    global_names = s.get_names()
-    output = []
-    for n in global_names:
-        output.append(with_prefix("", n))
-        output.extend(
-            generate_nested(
-                n, n.name if n.type != "function" else "", None, server.project
-            )
-        )
-        output.extend(into_item(k) for k in get_keyword_names(n))
     if pos:
         containing_scopes = list(get_scopes(s, pos))
-        for scope in containing_scopes:
-            if scope.type == "function":
-                for n in scope.defined_names():
-                    output.append(with_prefix("", n))
-                    output.extend(
-                        generate_nested(
-                            n,
-                            n.name if n.type != "function" else "",
-                            None,
-                            server.project,
-                        )
-                    )
-    output = [x for x in set(output) if "__" not in x.value]
-    if len(output) < 2000:
-        output = output[:2000]
-    server.send_voice("enhance_spoken", "expression", output)
+    expressions = get_expressions(
+        s, server.configuration_settings.spoken.expressions, pos
+    )
+    server.send_voice("enhance_spoken", "expression", expressions)
     scope_message = "inside " + pretty_scope_list(containing_scopes) if pos else ""
     if imp is not None:
-        logger.info(f"{len(imp)} imports, {len(output)} expressions {scope_message}")
-        # server.show_message(f"{len(output)} expressions, {len(imp)} imports")
+        logger.info(
+            f"{len(imp)} imports, {len(expressions)} expressions {scope_message}"
+        )
+        # server.show_message(f"{len(expressions)} expressions, {len(imp)} imports")
     else:
-        logger.info(f"{len(output)} expressions {scope_message}")
-        # server.show_message(f"{len(output)} expressions, skipped imports")
+        logger.info(f"{len(expressions)} expressions {scope_message}")
+        # server.show_message(f"{len(expressions)} expressions, skipped imports")
 
 
 @server.command("add_import")

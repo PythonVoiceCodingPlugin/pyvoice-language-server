@@ -3,16 +3,23 @@ from typing import Optional, Sequence
 
 import jedi
 from cachetools import LRUCache, cached
+from lsprotocol.types import Position
 
 from pyvoice.custom_jedi_classes import Project
-from pyvoice.inference import instance_attributes, module_public_names
+from pyvoice.inference import (
+    get_keyword_names,
+    get_scopes,
+    instance_attributes,
+    module_public_names,
+)
 from pyvoice.speakify import speak_single_item
-from pyvoice.types import ExpressionItem
+from pyvoice.types import ExpressionItem, ExpressionSettings
 
 __all__ = [
     "generate_nested",
     "into_item",
     "with_prefix",
+    "get_expressions",
 ]
 
 
@@ -88,3 +95,39 @@ def _generate_nested(
         for n in name.defined_names():
             if n.type == "statement":
                 yield with_prefix(prefix, n)
+
+
+def get_expressions(
+    script: jedi.api.Script, settings: ExpressionSettings, pos: Optional[Position]
+) -> Sequence[ExpressionItem]:
+    global_names = script.get_names()
+    output = []
+    for n in global_names:
+        output.append(with_prefix("", n))
+        output.extend(
+            generate_nested(
+                n,
+                n.name if n.type != "function" else "",
+                None,
+                script._inference_state.project,
+            )
+        )
+        output.extend(into_item(k) for k in get_keyword_names(n))
+    if pos:
+        containing_scopes = list(get_scopes(script, pos))
+        for scope in containing_scopes:
+            if scope.type == "function":
+                for n in scope.defined_names():
+                    output.append(with_prefix("", n))
+                    output.extend(
+                        generate_nested(
+                            n,
+                            n.name if n.type != "function" else "",
+                            None,
+                            script._inference_state.project,
+                        )
+                    )
+    output = [x for x in set(output) if "__" not in x.value]
+    if len(output) < 2000:
+        output = output[:2000]
+    return output
