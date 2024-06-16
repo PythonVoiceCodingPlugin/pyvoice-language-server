@@ -1,4 +1,3 @@
-import enum
 from pathlib import Path
 from typing import NewType, Optional, Tuple
 
@@ -7,7 +6,6 @@ from cattrs import Converter
 from pygls.server import LanguageServer
 
 __all__ = [
-    "SpokenKind",
     "ModuleItem",
     "ExpressionItem",
     "RelativePath",
@@ -15,10 +13,6 @@ __all__ = [
     "Settings",
     "register_custom_hooks",
 ]
-
-
-class SpokenKind(enum.Flag):
-    IMPORTABLE = enum.auto()
 
 
 @attrs.frozen
@@ -29,11 +23,10 @@ class ExpressionItem:
 
 @attrs.define
 class ModuleItem:
-    spoken: str
     module: str
     name: Optional[str] = attrs.field(default=None)
     asname: Optional[str] = attrs.field(default=None)
-    kind: SpokenKind = attrs.field(default=SpokenKind.IMPORTABLE)
+    spoken: str = attrs.field(default="")
 
 
 RelativePath = NewType("RelativePath", Path)
