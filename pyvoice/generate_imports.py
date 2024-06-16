@@ -1,6 +1,7 @@
 import configparser
 import functools
 import itertools
+import logging
 from pathlib import Path
 from typing import List, Optional, Sequence
 
@@ -126,6 +127,9 @@ def _get_traditional_dependencies(project: Project) -> Sequence[str]:
     return [x.name for x in find_requirements(project.path)]
 
 
+logger = logging.getLogger(__name__)
+
+
 def get_top_level_dependencies_names(project: Project) -> Sequence[str]:
     for method in (
         _get_pep621_dependencies,
@@ -134,7 +138,9 @@ def get_top_level_dependencies_names(project: Project) -> Sequence[str]:
         _get_traditional_dependencies,
     ):
         try:
-            return method(project)
+            result = method(project)
+            logger.debug(f"Found dependencies {result} using {method.__name__} method")
+            return result
         except RequirementsNotFound:
             pass
     return []
