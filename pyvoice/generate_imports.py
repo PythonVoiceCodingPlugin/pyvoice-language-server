@@ -1,3 +1,4 @@
+import configparser
 import functools
 import itertools
 from pathlib import Path
@@ -52,7 +53,22 @@ def _get_pyproject_toml(project: Project) -> Optional[dict]:
         return None
 
 
-# def _get_dependencies_from_pyproject_toml(project: Project) -> Sequence[str]:
+@cached(
+    cache=LRUCache(maxsize=4),
+    key=lambda project: (project.path, project.path.stat().st_mtime),
+)
+def _get_setupcfg(project: Project) -> Optional[configparser.ConfigParser]:
+    try:
+        p = project.path / "setup.cfg"
+        if not p.exists():
+            return None
+        config = configparser.ConfigParser()
+        config.read(p)
+        return config
+    except Exception:
+        return None
+
+
 def _get_pep621_dependencies(project: Project) -> Sequence[str]:
     pyproject_toml = _get_pyproject_toml(project)
     if pyproject_toml is None:
@@ -84,6 +100,28 @@ def _get_poetry_dependencies(project: Project) -> Sequence[str]:
         ) from e
 
 
+def _get_setupcfg_dependencies(project: Project) -> Sequence[str]:
+    config = _get_setupcfg(project)
+    if config is None:
+        raise RequirementsNotFound("setup.cfg not found or could not be parsed")
+
+    if "options" in config and "install_requires" in config["options"]:
+        dependencies_str = config["options"]["install_requires"]
+        dependencies_specs = [
+            dep.strip() for dep in dependencies_str.split("\n") if dep.strip()
+        ]
+
+    try:
+        dependencies = [DetectedRequirement.parse(x) for x in dependencies_specs]
+        return [
+            x.name
+            for x in dependencies
+            if x is not None and x.name is not None and x.name != "python"
+        ]
+    except (KeyError, AttributeError) as e:
+        raise RequirementsNotFound("No dependencies found in setup.cfg") from e
+
+
 def _get_traditional_dependencies(project: Project) -> Sequence[str]:
     return [x.name for x in find_requirements(project.path)]
 
@@ -92,6 +130,7 @@ def get_top_level_dependencies_names(project: Project) -> Sequence[str]:
     for method in (
         _get_pep621_dependencies,
         _get_poetry_dependencies,
+        _get_setupcfg_dependencies,
         _get_traditional_dependencies,
     ):
         try:

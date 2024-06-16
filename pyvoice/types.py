@@ -82,6 +82,7 @@ class ThirdPartyImportsSettings:
     will try:
     - pep621 dependencies in pyproject.toml
     - poetry dependencies in pyproject.toml
+    - options.install_requires in setup.cfg
     - traditional requirements.txt
     NOTE: By default hints would be generated ONLY for your top level dependencies
     aka distributions that you directly depend on, not transiet dependencies.
