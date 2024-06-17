@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import NewType, Optional, Tuple
+from typing import List, NewType, Optional, Tuple, Union
 
 import attrs
 from cattrs import Converter
@@ -174,4 +174,11 @@ def register_custom_hooks(server: LanguageServer):
             return p
         return (base_path / p).absolute()
 
+    def one_or_more(value, _):
+        if isinstance(value, list):
+            return converter.structure(value, List[ModuleItem])
+        else:
+            return [converter.structure(value, ModuleItem)]
+
     converter.register_structure_hook(RelativePath, rel_path_hook)
+    converter.register_structure_hook(Union[ModuleItem, List[ModuleItem]], one_or_more)

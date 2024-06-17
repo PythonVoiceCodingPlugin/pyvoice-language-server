@@ -176,8 +176,7 @@ def function(
 def function_add_import(
     server: PyVoiceLanguageServer,
     doc_uri: str,
-    items: ModuleItem,
-    # items: Union[ModuleItem, List[ModuleItem]],
+    items: Union[ModuleItem, List[ModuleItem]],
 ):
     server.show_message(f"{items}")
     document = server.workspace.get_document(doc_uri)
