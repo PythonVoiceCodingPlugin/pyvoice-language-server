@@ -13,7 +13,7 @@ from pyvoice.inference import (
     module_public_names,
 )
 from pyvoice.speakify import speak_single_item
-from pyvoice.types import ExpressionItem, ExpressionSettings
+from pyvoice.types import ExpressionItem, ExpressionSettings, ScopeSettings
 
 __all__ = [
     "generate_nested",
@@ -97,9 +97,22 @@ def _generate_nested(
                 yield with_prefix(prefix, n)
 
 
+def _get_expressions_from_builtins(
+    project: Project, settings: ScopeSettings
+) -> Sequence[ExpressionItem]:
+    if not settings.enabled:
+        return []
+    return [
+        into_item(x)
+        for x in module_public_names(project, "builtins")
+        if not x.name.startswith("_")
+    ]
+
+
 def get_expressions(
     script: jedi.api.Script, settings: ExpressionSettings, pos: Optional[Position]
 ) -> Sequence[ExpressionItem]:
+    project = script._inference_state.project
     global_names = script.get_names()
     output = []
     for n in global_names:
@@ -127,6 +140,10 @@ def get_expressions(
                             script._inference_state.project,
                         )
                     )
+    expressions_from_builtins = _get_expressions_from_builtins(
+        project, settings.builtins
+    )
+    output.extend(expressions_from_builtins)
     output = [x for x in set(output) if "__" not in x.value]
     if len(output) > settings.limit:
         output = output[: settings.limit]
