@@ -181,7 +181,9 @@ def function_add_import(
 ):
     server.show_message(f"{items}")
     document = server.workspace.get_document(doc_uri)
-    result = add_imports_to_code(document.source, items)
+    result = add_imports_to_code(
+        document.source, items if isinstance(items, list) else [items]
+    )
     edit = WorkspaceEdit(changes={doc_uri: lsp_text_edits(document, result)})
     server.apply_edit(edit)
 
