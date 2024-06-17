@@ -124,7 +124,7 @@ class ImportSettings:
 # Settings for the various generators of spoken expressions
 
 
-@attrs.define
+@attrs.frozen
 class ScopeSettings:
     # Enable or disable the generation of spoken hints for this scope
     enabled: bool = attrs.field(default=True)

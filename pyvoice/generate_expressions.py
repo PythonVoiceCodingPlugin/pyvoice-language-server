@@ -1,4 +1,6 @@
 import functools
+import logging
+from itertools import chain
 from typing import Optional, Sequence
 
 import jedi
@@ -21,6 +23,8 @@ __all__ = [
     "with_prefix",
     "get_expressions",
 ]
+
+logger = logging.getLogger(__name__)
 
 
 @functools.lru_cache(maxsize=1024 * 8)
@@ -97,54 +101,93 @@ def _generate_nested(
                 yield with_prefix(prefix, n)
 
 
+@cached(cache=LRUCache(maxsize=4))
 def _get_expressions_from_builtins(
     project: Project, settings: ScopeSettings
 ) -> Sequence[ExpressionItem]:
     if not settings.enabled:
         return []
     return [
-        into_item(x)
-        for x in module_public_names(project, "builtins")
-        if not x.name.startswith("_")
+        into_item(x.name)
+        for x in project.get_script(code="").complete()
+        if not x.name.startswith("_") and not x.type == "keyword"
     ]
 
 
-def get_expressions(
-    script: jedi.api.Script, settings: ExpressionSettings, pos: Optional[Position]
+def _get_expressions_from_scope(
+    scope: jedi.api.classes.Name, project: Project, settings: ScopeSettings
 ) -> Sequence[ExpressionItem]:
-    project = script._inference_state.project
-    global_names = script.get_names()
+    if not settings.enabled:
+        return []
     output = []
-    for n in global_names:
+    for n in scope.defined_names():
         output.append(with_prefix("", n))
         output.extend(
             generate_nested(
                 n,
                 n.name if n.type != "function" else "",
                 None,
-                script._inference_state.project,
+                project,
             )
         )
-        output.extend(into_item(k) for k in get_keyword_names(n))
+        if settings.signature:
+            output.extend(into_item(k) for k in get_keyword_names(n))
+    return output
+
+
+def get_expressions(
+    script: jedi.api.Script, settings: ExpressionSettings, pos: Optional[Position]
+) -> Sequence[ExpressionItem]:
+    project = script._inference_state.project
     if pos:
         containing_scopes = list(get_scopes(script, pos))
-        for scope in containing_scopes:
-            if scope.type == "function":
-                for n in scope.defined_names():
-                    output.append(with_prefix("", n))
-                    output.extend(
-                        generate_nested(
-                            n,
-                            n.name if n.type != "function" else "",
-                            None,
-                            script._inference_state.project,
-                        )
-                    )
+    else:
+        containing_scopes = list(get_scopes(script, None))
+
+    try:
+        local_scope, *non_local_scopes, global_scope = containing_scopes
+    except ValueError:
+        local_scope = None
+        non_local_scopes = []
+        global_scope = containing_scopes[0]
+
     expressions_from_builtins = _get_expressions_from_builtins(
         project, settings.builtins
     )
-    output.extend(expressions_from_builtins)
-    output = [x for x in set(output) if "__" not in x.value]
+    expressions_from_locals = (
+        _get_expressions_from_scope(local_scope, project, settings.locals)
+        if local_scope
+        else []
+    )
+    expressions_from_globals = _get_expressions_from_scope(
+        global_scope, project, settings.globals
+    )
+    expressions_from_non_locals = list(
+        chain.from_iterable(
+            _get_expressions_from_scope(scope, project, settings.nonlocals)
+            for scope in non_local_scopes
+            if scope.type == "function"
+        )
+    )
+    logger.debug(
+        "Found %s local expressions, %s global expressions,"
+        " %s builtin expressions, %s nonlocal expressions",
+        len(expressions_from_locals),
+        len(expressions_from_globals),
+        len(expressions_from_builtins),
+        len(expressions_from_non_locals),
+    )
+    output = list(
+        x
+        for x in chain(
+            expressions_from_builtins,
+            expressions_from_locals,
+            expressions_from_globals,
+            expressions_from_non_locals,
+        )
+        if "__" not in x.value
+    )
+
     if len(output) > settings.limit:
         output = output[: settings.limit]
     return output
