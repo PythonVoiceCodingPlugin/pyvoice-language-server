@@ -46,7 +46,9 @@ def lsp_text_edits(document: Document, new_code: str) -> List[TextEdit]:
             new_text = new_code[opcode.new_start : opcode.new_end]
             text_edits.append(
                 TextEdit(
-                    range=Range(start=start, end=end),
+                    range=document._position_codec.range_to_client_units(
+                        position_lookup.lines, Range(start=start, end=end)
+                    ),
                     new_text=new_text,
                 )
             )
@@ -85,9 +87,10 @@ class PositionLookup:
 
     def __init__(self, code: str) -> None:
         # Create a list saying at what offset in the file each line starts.
+        self.lines = code.splitlines(keepends=True)
         self.line_starts = []
         offset = 0
-        for line in code.splitlines(keepends=True):
+        for line in self.lines:
             self.line_starts.append(offset)
             offset += len(line)
 
