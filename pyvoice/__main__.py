@@ -1,7 +1,5 @@
 """Command-line interface."""
 
-import logging
-
 import click
 
 from pyvoice.logging import configure_logging
@@ -10,10 +8,9 @@ from pyvoice.server import server
 
 @click.command()
 @click.version_option()
-@click.option("--verbose", "-v", is_flag=True, help="Enable verbose logging")
-def main(verbose: bool) -> None:
+def main() -> None:
     """pyvoice."""
-    configure_logging(server, logging.DEBUG if verbose else logging.INFO)
+    configure_logging(server)
     server.start_io()
 
 

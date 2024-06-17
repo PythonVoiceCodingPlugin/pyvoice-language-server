@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import List, NewType, Optional, Tuple, Union
+from typing import List, Literal, NewType, Optional, Tuple, Union
 
 import attrs
 from cattrs import Converter
@@ -159,9 +159,28 @@ class SpokenSettings:
 
 
 @attrs.define
+class LoggingSettings:
+    # set the logging level for pyvoice executable
+    # logs should show up at your client's console
+    level: Literal[
+        "DEBUG",
+        "INFO",
+        "WARNING",
+        "ERROR",
+        "CRITICAL",
+        "debug",
+        "info",
+        "warning",
+        "error",
+        "critical",
+    ] = attrs.field(default="INFO")
+
+
+@attrs.define
 class Settings:
     project: ProjectSettings = attrs.field(default=ProjectSettings())
     spoken: SpokenSettings = attrs.field(default=SpokenSettings())
+    logging: LoggingSettings = attrs.field(factory=LoggingSettings)
 
 
 def register_custom_hooks(server: LanguageServer):

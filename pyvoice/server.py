@@ -35,6 +35,7 @@ from pyvoice.inference import (
     module_public_names_fuzzy,
     pretty_scope_list,
 )
+from pyvoice.logging import configure_logging
 from pyvoice.speakify import speak_single_item
 from pyvoice.transformations import add_imports_to_code
 from pyvoice.types import ModuleItem, Settings, register_custom_hooks
@@ -125,6 +126,7 @@ def workspace_did_change_configuration(
     ls: PyVoiceLanguageServer, params: DidChangeConfigurationParams
 ):
     ls._configuration_settings = ls.lsp._converter.structure(params.settings, Settings)
+    configure_logging(ls, ls.configuration_settings.logging)
     try:
         del ls._project
     except AttributeError:

@@ -3,6 +3,8 @@ import logging
 from lsprotocol.types import MessageType
 from pygls.server import LanguageServer
 
+from pyvoice.types import LoggingSettings
+
 
 class LanguageServerLogHandler(logging.Handler):
     def __init__(self, language_server: LanguageServer):
@@ -25,16 +27,20 @@ class LanguageServerLogHandler(logging.Handler):
             pass  # noqa
 
 
-def configure_logging(language_server: LanguageServer, level: int):
-    logger = logging.getLogger(__package__)
-    logger.setLevel(level)
+_default_logging_settings = LoggingSettings()
+
+
+def configure_logging(
+    language_server: LanguageServer,
+    settings: LoggingSettings = _default_logging_settings,
+):
+    level = getattr(logging, settings.level.upper())
 
     formatter = logging.Formatter("%(name)s - %(message)s - %(asctime)s")
-
-    # Create a handler and set the formatter
     handler = LanguageServerLogHandler(language_server)
     handler.setFormatter(formatter)
 
-    # Add the handler to the root logger
+    logger = logging.getLogger(__package__)
+    logger.handlers.clear()
     logger.addHandler(handler)
-    # raise ValueError(level)
+    logger.setLevel(level)
