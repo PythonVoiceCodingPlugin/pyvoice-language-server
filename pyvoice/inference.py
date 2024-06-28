@@ -80,16 +80,20 @@ def module_public_names(
 def module_public_names_fuzzy(
     project: Project, current_path: str, module_name: str, name: str
 ) -> Sequence[jedi.api.classes.BaseName]:
-    ignore = ignored_names(project)
-    return [
+
+    # this will not work for relative import but anyhow
+    public_names = module_public_names(project, module_name)
+    public_names_identifiers = {x.name for x in public_names}
+    candidates = [
         name
         for name in jedi.Script(
-            f"from {module_name} import *\n{name.replace(' ','')}",
+            f"from {module_name} import {name.replace(' ','')}",
             project=project,
             path=current_path,
         ).complete(fuzzy=True)
-        if name.full_name not in ignore and name.full_name
+        if name.full_name
     ]
+    return [x for x in candidates if x.name in public_names_identifiers]
 
 
 def join_names(a: str, b: str) -> str:
