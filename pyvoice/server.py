@@ -192,10 +192,15 @@ def function_add_import(
 @server.command("from_import")
 def function_from_import(server: PyVoiceLanguageServer, item: ModuleItem):
     module_name = join_names(item.module, item.name)
+    public_names = module_public_names(server.project, module_name)
+    public_names_identifiers = [x.name for x in public_names]
     s = [
         ModuleItem(spoken=speak_single_item(x.name), module=module_name, name=x.name)
-        for x in module_public_names(server.project, module_name)
+        for x in public_names
     ]
+    logger.info(
+        "Found %s subsymbols in %s: %s", len(s), module_name, public_names_identifiers
+    )
     server.send_voice("enhance_spoken", "subsymbol", s)
 
 
