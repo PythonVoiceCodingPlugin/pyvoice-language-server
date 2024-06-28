@@ -2,11 +2,13 @@ import configparser
 import functools
 import itertools
 import logging
+import os
 from pathlib import Path
-from typing import List, Optional, Sequence
+from typing import List, Optional, Sequence, Tuple, Union
 
 import toml
 from cachetools import LRUCache, TTLCache, cached
+from cachetools.keys import hashkey
 from importlib_metadata import Distribution
 from requirements_detector import find_requirements
 from requirements_detector.exceptions import RequirementsNotFound
@@ -41,10 +43,35 @@ __all__ = [
     "get_top_level_dependencies_names",
 ]
 
+StrPath = Union[str, os.PathLike[str]]
+
+
+def _get_mod_timestamp(path: Path) -> Optional[float]:
+    try:
+        return path.stat().st_mtime
+    except FileNotFoundError:
+        return None
+
+
+def _get_project_modification_timestamps(
+    project: Project, *files: StrPath
+) -> Tuple[Optional[float], ...]:
+    return tuple(_get_mod_timestamp(project.path / file) for file in files)
+
+
+def _project_modification_time_aware_key(*files: StrPath):
+    def custom_key(project, *args, **kwargs):
+        mod_key = _get_project_modification_timestamps(project, *files)
+        classic_key = hashkey(project, *args, **kwargs)
+        classic_key += mod_key
+        return classic_key
+
+    return custom_key
+
 
 @cached(
     cache=LRUCache(maxsize=4),
-    key=lambda project: (project.path, project.path.stat().st_mtime),
+    key=_project_modification_time_aware_key("pyproject.toml"),
 )
 def _get_pyproject_toml(project: Project) -> Optional[dict]:
     try:
@@ -55,8 +82,7 @@ def _get_pyproject_toml(project: Project) -> Optional[dict]:
 
 
 @cached(
-    cache=LRUCache(maxsize=4),
-    key=lambda project: (project.path, project.path.stat().st_mtime),
+    cache=LRUCache(maxsize=4), key=_project_modification_time_aware_key("setup.cfg")
 )
 def _get_setupcfg(project: Project) -> Optional[configparser.ConfigParser]:
     try:
@@ -164,15 +190,27 @@ def get_modules_from_distribution(project: Project, name: str) -> Sequence[Modul
         return []
 
 
-@cached(cache=LRUCache(maxsize=4))
+@cached(
+    cache=LRUCache(maxsize=4),
+    key=_project_modification_time_aware_key(
+        ".",
+        "pyproject.toml",
+        "setup.cfg",
+        "requirements.txt",
+        "requirements.in",
+        "requirements",
+    ),
+)
 def get_top_level_dependencies_modules(
     project: Project, settings: ThirdPartyImportsSettings
 ):
     if not settings.enabled:
         return []
     detected = get_top_level_dependencies_names(project)
-    detected.extend(settings.include_dists)
-    names = filter(lambda x: x not in settings.exclude_dists, set(detected))
+    with_includes = set(
+        itertools.chain.from_iterable((detected, settings.include_dists))
+    )
+    names = filter(lambda x: x not in settings.exclude_dists, with_includes)
     return [
         x
         for dependency_name in names
@@ -245,7 +283,7 @@ def get_project_modules(project: Project, settings: ProjectImportsSettings):
         ]
     # if that fails, we allow for a mixure of what setuptools
     # calls flat layout package and flat layout module
-    output = []
+    output: List[ModuleItem] = []
     top_modules: List[str] = FlatLayoutModuleFinder.find(project.path)
     output.extend(
         ModuleItem(spoken=speak_single_item(x), module=x, name=None)
