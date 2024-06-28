@@ -1,6 +1,6 @@
 import functools
 import logging
-from typing import Sequence, Set
+from typing import Optional, Sequence, Set
 
 import jedi
 from cachetools import LRUCache, cached
@@ -49,7 +49,7 @@ def ignored_names(project: Project):
     return {x.full_name for x in jedi.Script("", project=project).complete()}
 
 
-def _get_module__all__(names: Sequence[jedi.api.classes.Name]) -> Set[str]:
+def _get_module__all__(names: Sequence[jedi.api.classes.Name]) -> Optional[Set[str]]:
     try:
         all_name = next(x for x in names if x.name == "__all__")
         return set(
@@ -58,7 +58,7 @@ def _get_module__all__(names: Sequence[jedi.api.classes.Name]) -> Set[str]:
             for x in literal_sequence._name._value.py__iter__()
         )
     except (AttributeError, StopIteration):
-        return {}
+        return None
 
 
 @functools.lru_cache(maxsize=128)
@@ -67,10 +67,9 @@ def module_public_names(
     module_name: str,
 ) -> Sequence[jedi.api.classes.BaseName]:
     small_script = project.get_script(
-        code=f"from {module_name} import \n",
+        code=f"from {module_name} import ",
     )
     completions = small_script.complete()
-
     module__all__ = _get_module__all__(completions)
     if module__all__ is not None:
         return [name for name in completions if name.name in module__all__]
