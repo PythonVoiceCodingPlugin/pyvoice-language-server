@@ -79,7 +79,7 @@ def _generate_nested(
             level += 1
         for n in module_public_names(project, name.full_name):
             yield with_prefix(prefix, n)
-            yield from _generate_nested(n, prefix, level - 1)
+            yield from _generate_nested(n, prefix, level - 1, project)
     elif name.type == "instance":
         for n in instance_attributes(name.full_name, project):
             yield with_prefix(prefix, n)
