@@ -136,13 +136,10 @@ def _get_expressions_from_scope(
 
 
 def get_expressions(
-    script: jedi.api.Script, settings: ExpressionSettings, pos: Optional[Position]
+    script: jedi.api.Script, settings: ExpressionSettings, pos: Position
 ) -> Sequence[ExpressionItem]:
     project = script._inference_state.project
-    if pos:
-        containing_scopes = list(get_scopes(script, pos))
-    else:
-        containing_scopes = list(get_scopes(script, None))
+    containing_scopes = list(get_scopes(script, pos))
 
     try:
         local_scope, *non_local_scopes, global_scope = containing_scopes

@@ -147,7 +147,7 @@ def workspace_did_change_configuration(
 def function(
     server: PyVoiceLanguageServer,
     doc_uri: str,
-    pos: Position = None,
+    pos: Position,
     generate_importables: bool = True,
 ):
     document = server.workspace.get_document(doc_uri)
@@ -157,8 +157,7 @@ def function(
         server.send_voice("enhance_spoken", "importable", imp)
     else:
         imp = None
-    if pos:
-        containing_scopes = list(get_scopes(s, pos))
+    containing_scopes = list(get_scopes(s, pos))
     expressions = get_expressions(
         s, server.configuration_settings.spoken.expressions, pos
     )
