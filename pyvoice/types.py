@@ -179,7 +179,7 @@ class LoggingSettings:
 @attrs.define
 class Settings:
     project: ProjectSettings = attrs.field(default=ProjectSettings())
-    spoken: SpokenSettings = attrs.field(default=SpokenSettings())
+    hints: SpokenSettings = attrs.field(default=SpokenSettings())
     logging: LoggingSettings = attrs.field(factory=LoggingSettings)
 
 

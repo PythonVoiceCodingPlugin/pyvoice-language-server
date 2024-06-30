@@ -153,13 +153,13 @@ def function(
     document = server.workspace.get_document(doc_uri)
     s = server.project.get_script(document=document)
     if generate_importables:
-        imp = get_modules(server.project, server.configuration_settings.spoken.imports)
+        imp = get_modules(server.project, server.configuration_settings.hints.imports)
         server.send_voice("enhance_spoken", "importable", imp)
     else:
         imp = None
     containing_scopes = list(get_scopes(s, pos))
     expressions = get_expressions(
-        s, server.configuration_settings.spoken.expressions, pos
+        s, server.configuration_settings.hints.expressions, pos
     )
     server.send_voice("enhance_spoken", "expression", expressions)
     scope_message = "inside " + pretty_scope_list(containing_scopes) if pos else ""
