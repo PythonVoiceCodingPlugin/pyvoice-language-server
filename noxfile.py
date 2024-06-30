@@ -1,4 +1,5 @@
 """Nox sessions."""
+
 import os
 import shlex
 import shutil
@@ -135,9 +136,9 @@ def safety(session: Session) -> None:
 @session(python=python_versions)
 def mypy(session: Session) -> None:
     """Type-check using mypy."""
-    args = session.posargs or ["pyvoice", "tests", "docs/conf.py"]
+    args = session.posargs or ["pyvoice"]
     session.install(".")
-    session.install("mypy", "pytest")
+    session.install(*group("mypy"))
     session.run("mypy", *args)
 
 
