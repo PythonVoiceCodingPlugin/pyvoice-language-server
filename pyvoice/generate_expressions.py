@@ -1,7 +1,7 @@
 import functools
 import logging
 from itertools import chain
-from typing import Optional, Sequence
+from typing import Iterable, Mapping, Optional, Sequence
 
 import jedi
 from cachetools import LRUCache, cached
@@ -43,7 +43,13 @@ def with_prefix(prefix: str, name: jedi.api.classes.BaseName) -> ExpressionItem:
     return into_item(f"{prefix}{n}")
 
 
-default_levels = {"module": 1, "instance": 2, "variable": 2, "param": 2, "statement": 2}
+default_levels: Mapping[str, int] = {
+    "module": 1,
+    "instance": 2,
+    "variable": 2,
+    "param": 2,
+    "statement": 2,
+}
 
 
 @cached(
@@ -60,7 +66,7 @@ def generate_nested(
     prefix: str,
     level: Optional[int] = None,
     project: Optional[Project] = None,
-) -> Sequence[str]:
+) -> Sequence[ExpressionItem]:
     return list(_generate_nested(name, prefix, level, project))
 
 
@@ -69,36 +75,40 @@ def _generate_nested(
     prefix: str,
     level: Optional[int] = None,
     project: Optional[Project] = None,
-):
+) -> Iterable[ExpressionItem]:
     if level is None:
         level = default_levels.get(name.type, 1)
-    if level <= 0:
-        return
-    if name.type == "module":
-        if name.name == "pytest":
-            level += 1
-        for n in module_public_names(project, name.full_name):
-            yield with_prefix(prefix, n)
-            yield from _generate_nested(n, prefix, level - 1, project)
-    elif name.type == "instance":
-        for n in instance_attributes(name.full_name, project):
-            yield with_prefix(prefix, n)
-            if (
-                n.type in ["instance", "variable", "statement", "param"]
-                and not name.name.startswith("_")
-                and not n.name.startswith("_")
-                and True
-            ):
-                yield from _generate_nested(n, f"{prefix}.{n.name}", level - 1, project)
-    elif name.type in ["variable", "statement", "param"]:
-        for n in name.infer():
-            yield from _generate_nested(n, prefix, level, project)
-    elif name.type == "function":
-        return
-    elif name.type == "class" and hasattr(name, "defined_names"):
-        for n in name.defined_names():
-            if n.type == "statement":
+        yield from generate_nested(name, prefix, level, project)
+    else:
+        if level <= 0:
+            return
+        if name.type == "module":
+            if name.name == "pytest":
+                level += 1
+            for n in module_public_names(project, name.full_name):
                 yield with_prefix(prefix, n)
+                yield from _generate_nested(n, prefix, level - 1, project)
+        elif name.type == "instance":
+            for n in instance_attributes(name.full_name, project):
+                yield with_prefix(prefix, n)
+                if (
+                    n.type in ["instance", "variable", "statement", "param"]
+                    and not name.name.startswith("_")
+                    and not n.name.startswith("_")
+                    and True
+                ):
+                    yield from _generate_nested(
+                        n, f"{prefix}.{n.name}", level - 1, project
+                    )
+        elif name.type in ["variable", "statement", "param"]:
+            for n in name.infer():
+                yield from _generate_nested(n, prefix, level, project)
+        elif name.type == "function":
+            return
+        elif name.type == "class" and hasattr(name, "defined_names"):
+            for n in name.defined_names():
+                if n.type == "statement":
+                    yield with_prefix(prefix, n)
 
 
 @cached(cache=LRUCache(maxsize=4))

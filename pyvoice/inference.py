@@ -1,6 +1,6 @@
 import functools
 import logging
-from typing import Optional, Sequence, Set
+from typing import Optional, Sequence, Set, cast
 
 import jedi
 from cachetools import LRUCache, cached
@@ -23,7 +23,7 @@ __all__ = [
 
 @functools.lru_cache(maxsize=128)
 def instance_attributes(
-    full_name: str, project: Project
+    full_name: Optional[str], project: Project
 ) -> Sequence[jedi.api.classes.BaseName]:
     if full_name is None:
         return []
@@ -40,8 +40,10 @@ _."""
 
 
 @cached(cache=LRUCache(maxsize=512 * 4), key=lambda n: n.full_name)
-def get_keyword_names(n: jedi.api.classes.BaseName) -> Sequence[str]:
-    return {p.name for signature in n.get_signatures() for p in signature.params}
+def get_keyword_names(n: jedi.api.classes.BaseName) -> Set[str]:
+    return {
+        cast(str, p.name) for signature in n.get_signatures() for p in signature.params
+    }
 
 
 @functools.lru_cache()

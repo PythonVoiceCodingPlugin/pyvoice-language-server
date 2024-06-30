@@ -22,7 +22,6 @@ from lsprotocol.types import (
     ShowMessageRequestParams,
     WorkspaceEdit,
 )
-from pygls import protocol
 from pygls.server import LanguageServer
 
 from pyvoice.custom_jedi_classes import Project
@@ -42,7 +41,6 @@ from pyvoice.types import ModuleItem, Settings, register_custom_hooks
 
 from .text_edit_utils import lsp_text_edits
 
-protocol.deserialize_command = lambda p: p
 F = TypeVar("F", bound=Callable)
 
 
@@ -53,10 +51,11 @@ class PyVoiceLanguageServer(LanguageServer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         register_custom_hooks(self)
+        # mypy workaround
+        self._project: Project
+        self._configuration_settings: Settings
 
-    def command(
-        self, command_name: str
-    ) -> Callable[[F], Callable[["PyVoiceLanguageServer", Any], Any]]:
+    def command(self, command_name: str) -> Callable[[F], F]:
         """Decorator used to register custom commands.
 
         Example:
@@ -155,11 +154,13 @@ def function(
 ):
     document = server.workspace.get_document(doc_uri)
     s = server.project.get_script(document=document)
-    if generate_importables:
-        imp = get_modules(server.project, server.configuration_settings.hints.imports)
+    imp = (
+        get_modules(server.project, server.configuration_settings.hints.imports)
+        if generate_importables
+        else None
+    )
+    if imp:
         server.send_voice("enhance_spoken", "importable", imp)
-    else:
-        imp = None
     containing_scopes = list(get_scopes(s, pos))
     expressions = get_expressions(
         s, server.configuration_settings.hints.expressions, pos
@@ -193,7 +194,7 @@ def function_add_import(
 
 @server.command("from_import")
 def function_from_import(server: PyVoiceLanguageServer, item: ModuleItem):
-    module_name = join_names(item.module, item.name)
+    module_name = join_names(item.module, item.name or "")
     public_names = module_public_names(server.project, module_name)
     public_names_identifiers = [x.name for x in public_names]
     s = [
@@ -214,7 +215,7 @@ def function_from_import_fuzzy(
     name: str,
     every: bool,
 ):
-    module_name = join_names(item.module, item.name)
+    module_name = join_names(item.module, item.name or "")
     document = server.workspace.get_document(doc_uri)
     choices = module_public_names_fuzzy(
         server.project, document.path, module_name, name
