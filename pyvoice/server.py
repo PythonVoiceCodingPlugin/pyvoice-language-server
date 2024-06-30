@@ -100,7 +100,10 @@ class PyVoiceLanguageServer(LanguageServer):
 
     @property
     def configuration_settings(self) -> Settings:
-        return getattr(self, "_configuration_settings", Settings())
+        try:
+            return self._configuration_settings
+        except AttributeError:
+            return self.lsp._converter.structure({"project": {"path": "."}}, Settings)
 
     def send_voice(self, command: str, *args, **kwargs):
         server.send_notification(

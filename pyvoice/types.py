@@ -36,7 +36,7 @@ RelativePath = NewType("RelativePath", Path)
 class ProjectSettings:
     # The base path where your python project is located.
     # It can be either absolute or relative to the path of the sublime project.
-    path: RelativePath = attrs.field(default=RelativePath("."))
+    path: RelativePath = attrs.field()
 
     # The path to the root of the virtual environment.
     # It can be either absolute or relative to the sublime project path.
@@ -178,8 +178,8 @@ class LoggingSettings:
 
 @attrs.define
 class Settings:
-    project: ProjectSettings = attrs.field(default=ProjectSettings())
-    hints: SpokenSettings = attrs.field(default=SpokenSettings())
+    project: ProjectSettings = attrs.field()
+    hints: SpokenSettings = attrs.field(factory=SpokenSettings)
     logging: LoggingSettings = attrs.field(factory=LoggingSettings)
 
 
