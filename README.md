@@ -5,7 +5,8 @@
 [![Python Version](https://img.shields.io/pypi/pyversions/pyvoice-language-server)](https://pypi.org/project/pyvoice-language-server)
 [![License](https://img.shields.io/pypi/l/pyvoice-language-server)](https://opensource.org/licenses/GPL-3.0)
 
-
+> [!WARNING]
+> Pre release status, stable version very soon
 
 This is the language server component for the [pyvoice](https://github.com/PythonVoiceCodingPlugin/) system. 
 
