@@ -1,10 +1,10 @@
 # pyvoice
 
-[![PyPI](https://img.shields.io/pypi/v/pyvoice.svg)](https://pypi.org/project/pyvoice/)
-[![Status](https://img.shields.io/pypi/status/pyvoice.svg)](https://pypi.org/project/pyvoice/)
-[![Python Version](https://img.shields.io/pypi/pyversions/pyvoice)](https://pypi.org/project/pyvoice)
-[![License](https://img.shields.io/pypi/l/pyvoice)](https://opensource.org/licenses/GPL-3.0)
-[![Tests](https://github.com/PythonVoiceCodingPlugin/pyvoice/workflows/Tests/badge.svg)](https://github.com/PythonVoiceCodingPlugin/pyvoice/actions?workflow=Tests)
+[![PyPI](https://img.shields.io/pypi/v/pyvoice-language-server.svg)](https://pypi.org/project/pyvoice-language-server/)
+[![Status](https://img.shields.io/pypi/status/pyvoice-language-server.svg)](https://pypi.org/project/pyvoice-language-server/)
+[![Python Version](https://img.shields.io/pypi/pyversions/pyvoice-language-server)](https://pypi.org/project/pyvoice-language-server)
+[![License](https://img.shields.io/pypi/l/pyvoice-language-server)](https://opensource.org/licenses/GPL-3.0)
+
 
 
 This is the language server component for the [pyvoice](https://github.com/PythonVoiceCodingPlugin/) system. 
@@ -33,17 +33,27 @@ This is where all the heavy business logic and semantic analysis of the source c
 
 ## Installation
 
-Normally you should not have to install this package manually, as the editor plug-ins for Sublime and VSCode should automatically install it for you. However, if you want a more fine-grained control, you can install *pyvoice* from [PyPI](https://pypi.org/) with vanilla pip
+Normally you should not have to install this package manually, as the editor plug-ins for Sublime and VSCode should automatically install it for you. However, if you want a more fine-grained control, you can install the *pyvoice* executable from [PyPI](https://pypi.org/project/pyvoice-language-server/)
+
+- with vanilla pip
 
 ```console
-pip install pyvoice
+pip install pyvoice-language-server
 ```
 
-or (preferred) via [pipx](https://pipxproject.github.io/pipx/) so that it gets installed in an isolated environment.
+- or (preferred) via [pipx](https://pipxproject.github.io/pipx/) so that it gets installed in an isolated environment.
 
 ```console
-pipx install pyvoice
+pipx install pyvoice-language-server
 ```
+
+these commands will make the the 
+
+```console
+pyvoice
+```
+
+executable available in your command line
 
 
 ## Configuration

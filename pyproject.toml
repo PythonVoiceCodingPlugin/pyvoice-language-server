@@ -1,17 +1,19 @@
 [tool.poetry]
-name = "pyvoice"
-version = "0.0.0rc1.post2"
+name = "pyvoice-language-server"
+version = "0.0.0rc1"
 description = "Experimental python language server for programming by voice"
 authors = ["mpourmpoulis <35875229+mpourmpoulis@users.noreply.github.com>"]
 license = "GPL-3.0"
 readme = "README.md"
 homepage = "https://github.com/PythonVoiceCodingPlugin"
-repository = "https://github.com/PythonVoiceCodingPlugin/pyvoice"
+repository = "https://github.com/PythonVoiceCodingPlugin/pyvoice-language-server"
 # documentation = "https://pyvoice.readthedocs.io"
 classifiers = [
     "Development Status :: 1 - Planning",
 ]
-
+packages = [
+    { include = "pyvoice" },
+]
 [tool.poetry.urls]
 Changelog = "https://github.com/PythonVoiceCodingPlugin/pyvoice/releases"
 "Sublime Plugin" = "https://github.com/PythonVoiceCodingPlugin/LSP-pyvoice"
