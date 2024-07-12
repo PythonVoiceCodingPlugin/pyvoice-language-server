@@ -4,7 +4,7 @@ import itertools
 import logging
 import os
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple, Union
+from typing import TYPE_CHECKING, List, Optional, Sequence, Tuple, Union
 
 import toml
 from cachetools import LRUCache, TTLCache, cached
@@ -43,7 +43,10 @@ __all__ = [
     "get_top_level_dependencies_names",
 ]
 
-StrPath = Union[str, os.PathLike[str]]
+if TYPE_CHECKING:
+    StrPath = Union[str, os.PathLike[str]]
+else:
+    StrPath = Union[str, os.PathLike]
 
 
 def _get_mod_timestamp(path: Path) -> Optional[float]:
