@@ -1,21 +1,23 @@
 [tool.poetry]
 name = "pyvoice"
-version = "0.0.0b1"
-description = "pyvoice"
+version = "0.0.0rc1.post2"
+description = "Experimental python language server for programming by voice"
 authors = ["mpourmpoulis <35875229+mpourmpoulis@users.noreply.github.com>"]
 license = "GPL-3.0"
-readme = "README.rst"
-homepage = "https://github.com/PythonVoiceCodingPlugin/pyvoice"
+readme = "README.md"
+homepage = "https://github.com/PythonVoiceCodingPlugin"
 repository = "https://github.com/PythonVoiceCodingPlugin/pyvoice"
-documentation = "https://pyvoice.readthedocs.io"
+# documentation = "https://pyvoice.readthedocs.io"
 classifiers = [
     "Development Status :: 1 - Planning",
 ]
 
 [tool.poetry.urls]
 Changelog = "https://github.com/PythonVoiceCodingPlugin/pyvoice/releases"
-
-
+"Sublime Plugin" = "https://github.com/PythonVoiceCodingPlugin/LSP-pyvoice"
+"VSCode Plugin" = "https://github.com/PythonVoiceCodingPlugin/vscode-pyvoice"
+"Caster Grammar"="https://github.com/PythonVoiceCodingPlugin/pyvoice_caster"
+"Talon Grammar"="https://github.com/PythonVoiceCodingPlugin/pyvoice_talon"
 
 [tool.poetry.dependencies]
 python = "^3.8"
