@@ -183,7 +183,7 @@ def function_add_import(
     doc_uri: str,
     items: Union[ModuleItem, List[ModuleItem]],
 ):
-    server.show_message(f"{items}")
+    logger.debug(f"Attempting add_import {items}")
     document = server.workspace.get_document(doc_uri)
     result = add_imports_to_code(
         document.source, items if isinstance(items, list) else [items]
@@ -228,8 +228,6 @@ def function_from_import_fuzzy(
         )
     )
     chosen = choices if every else [choices[0]]
-    server.show_message(f"{choices}")
+    logger.info(f"Available choices for fuzzy import are {choices}")
     items = [ModuleItem(spoken="", module=module_name, name=x.name) for x in chosen]
     function_add_import(server, doc_uri, items)
-    # server.send_voice("enhance_from_import", s) server.send_voice()
-    # "pyvoice.types""pathlib.Path"
