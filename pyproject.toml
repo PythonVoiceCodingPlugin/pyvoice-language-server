@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyvoice-language-server"
-version = "0.0.0rc1"
+version = "0.1.0"
 description = "Experimental python language server for programming by voice"
 authors = ["mpourmpoulis <35875229+mpourmpoulis@users.noreply.github.com>"]
 license = "GPL-3.0"
@@ -17,9 +17,10 @@ packages = [
 [tool.poetry.urls]
 Changelog = "https://github.com/PythonVoiceCodingPlugin/pyvoice/releases"
 "Sublime Plugin" = "https://github.com/PythonVoiceCodingPlugin/LSP-pyvoice"
-"VSCode Plugin" = "https://github.com/PythonVoiceCodingPlugin/vscode-pyvoice"
+"VSCode Marketplace" = "https://marketplace.visualstudio.com/items?itemName=mpourmpoulis.pyvoice"
 "Caster Grammar"="https://github.com/PythonVoiceCodingPlugin/pyvoice_caster"
 "Talon Grammar"="https://github.com/PythonVoiceCodingPlugin/pyvoice_talon"
+Chat="https://app.gitter.im/?updated=1.11.31#/room/#pythonvoicecodingpluginpyvoice:gitter.im"
 
 [tool.poetry.dependencies]
 python = "^3.8"

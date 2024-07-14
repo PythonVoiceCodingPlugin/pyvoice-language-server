@@ -4,9 +4,8 @@
 [![Status](https://img.shields.io/pypi/status/pyvoice-language-server.svg)](https://pypi.org/project/pyvoice-language-server/)
 [![Python Version](https://img.shields.io/pypi/pyversions/pyvoice-language-server)](https://pypi.org/project/pyvoice-language-server)
 [![License](https://img.shields.io/pypi/l/pyvoice-language-server)](https://opensource.org/licenses/GPL-3.0)
+[![Gitter](https://badges.gitter.im/PythonVoiceCodingPlugin/pyvoice.svg)](https://app.gitter.im/?updated=1.11.31#/room/#pythonvoicecodingpluginpyvoice:gitter.im)
 
-> [!WARNING]
-> Pre release status, stable version very soon
 
 This is the language server component for the [pyvoice](https://github.com/PythonVoiceCodingPlugin/) system. 
 
