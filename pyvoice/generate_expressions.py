@@ -118,7 +118,7 @@ def _get_expressions_from_builtins(
     if not settings.enabled:
         return []
     return [
-        into_item(x.name)
+        with_prefix("", x)
         for x in project.get_script(code="").complete()
         if not x.name.startswith("_") and not x.type == "keyword"
     ]
