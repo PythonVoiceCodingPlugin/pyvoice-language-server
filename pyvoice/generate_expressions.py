@@ -93,19 +93,20 @@ def _generate_nested(
             nested = instance_attributes(name.full_name, project)
             forbidden = {"_" + x.name for x in nested}
             for n in nested:
-                if (
-                    n.type in ["instance", "variable", "statement", "param", "property"]
-                    and (not name.name.startswith("_") or forwarded)
-                    and (not n.name.startswith("_") or prefix == "self")
-                ):
-                    if n.name.startswith("_") and not (
-                        prefix == "self" and n.name not in forbidden
+                if n.type in ["instance", "variable", "statement", "param", "property"]:
+                    if (not name.name.startswith("_") or forwarded) and (
+                        not n.name.startswith("_") or prefix == "self"
                     ):
-                        return
+                        if n.name.startswith("_") and not (
+                            prefix == "self" and n.name not in forbidden
+                        ):
+                            return
+                        yield with_prefix(prefix, n)
+                        yield from _generate_nested(
+                            n, f"{prefix}.{n.name}", level - 1, project
+                        )
+                else:
                     yield with_prefix(prefix, n)
-                    yield from _generate_nested(
-                        n, f"{prefix}.{n.name}", level - 1, project
-                    )
         elif name.type in ["variable", "statement", "param", "property"]:
             for n in name.infer():
                 yield from _generate_nested(

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "pyvoice-language-server"
-version = "0.1.1"
+version = "0.1.2"
 description = "Experimental python language server for programming by voice"
 authors = ["mpourmpoulis <35875229+mpourmpoulis@users.noreply.github.com>"]
 license = "GPL-3.0"
