@@ -75,6 +75,7 @@ def _generate_nested(
     prefix: str,
     level: Optional[int] = None,
     project: Optional[Project] = None,
+    forwarded: bool = False,
 ) -> Iterable[ExpressionItem]:
     if level is None:
         level = default_levels.get(name.type, 1)
@@ -92,17 +93,22 @@ def _generate_nested(
             for n in instance_attributes(name.full_name, project):
                 yield with_prefix(prefix, n)
                 if (
-                    n.type in ["instance", "variable", "statement", "param"]
-                    and not name.name.startswith("_")
+                    n.type in ["instance", "variable", "statement", "param", "property"]
+                    and (not name.name.startswith("_") or forwarded)
                     and not n.name.startswith("_")
-                    and True
                 ):
                     yield from _generate_nested(
                         n, f"{prefix}.{n.name}", level - 1, project
                     )
-        elif name.type in ["variable", "statement", "param"]:
+        elif name.type in ["variable", "statement", "param", "property"]:
             for n in name.infer():
-                yield from _generate_nested(n, prefix, level, project)
+                yield from _generate_nested(
+                    n,
+                    prefix,
+                    level,
+                    project,
+                    forwarded=(not name.name.startswith("_") or prefix == "self"),
+                )
         elif name.type == "function":
             return
         elif name.type == "class" and hasattr(name, "defined_names"):
