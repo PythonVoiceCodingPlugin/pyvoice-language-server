@@ -17,6 +17,47 @@ digits_to_names = {
     "9": "nine",
 }
 
+pronunciation_dict = {
+    "casefold": "case fold",
+    "endswith": "ends with",
+    "expandtabs": "expand tabs",
+    "format_map": "format map",
+    "isalnum": "is alnum",
+    "isalpha": "is alpha",
+    "isascii": "is ascii",
+    "isdecimal": "is decimal",
+    "isdigit": "is digit",
+    "isidentifier": "is identifier",
+    "islower": "is lower",
+    "isnumeric": "is numeric",
+    "isprintable": "is printable",
+    "isspace": "is space",
+    "istitle": "is title",
+    "isupper": "is upper",
+    "join": "join",
+    "ljust": "L just",
+    "lstrip": "L strip",
+    "maketrans": "make trans",
+    "removeprefix": "remove prefix",
+    "removesuffix": "remove suffix",
+    "rfind": "R find",
+    "rindex": "R index",
+    "rjust": "R just",
+    "rpartition": "R partition",
+    "rsplit": "R split",
+    "rstrip": "R strip",
+    "splitlines": "split lines",
+    "startswith": "starts with",
+    "swapcase": "swap case",
+    "zfill": "Z fill",
+    "str": "string",
+    "int": "integer",
+    "isinstance": "is instance",
+    "issubclass": "is subclass",
+}
+
+digits_to_names.update(pronunciation_dict)
+
 
 @functools.lru_cache(maxsize=8192)
 def speak_single_item(text):
