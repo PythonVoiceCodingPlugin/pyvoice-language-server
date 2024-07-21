@@ -66,8 +66,10 @@ def _get_module__all__(names: Sequence[jedi.api.classes.Name]) -> Optional[Set[s
 @functools.lru_cache(maxsize=128)
 def module_public_names(
     project: Project,
-    module_name: str,
+    module_name: Optional[str],
 ) -> Sequence[jedi.api.classes.BaseName]:
+    if module_name is None:
+        return []
     small_script = project.get_script(
         code=f"from {module_name} import ",
     )
